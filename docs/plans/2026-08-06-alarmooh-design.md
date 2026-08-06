@@ -1,7 +1,7 @@
 # alarmooh — Design
 
 **Datum:** 2026-08-06
-**Status:** abgestimmt, bereit für die Implementierungsplanung
+**Status:** umgesetzt; nach Implementierung und Review am Code nachgezogen
 
 ## Zweck
 
@@ -27,7 +27,7 @@ Kein Backend, kein Netzwerkzugriff, keine Konten. Ein einzelner lokaler Prozess.
 | Kalenderquelle | EventKit über Kalender.app | Kein OAuth, kein Google-Cloud-Projekt, kein Netzwerkcode. macOS synchronisiert, alarmooh liest. |
 | Terminauswahl | Opt-out | Abonnierte Kalender alarmieren vollständig; einzelne Termine und Serien lassen sich stummschalten. |
 | Alarm-Darstellung | Schwebendes Panel unter dem Menüleisten-Icon | Über allen Fenstern und Spaces sichtbar, unabhängig von Fokus-Modus und Mitteilungszentrale. |
-| Alarmton | Datei in Application Support, im Repo nur ein Fallback-Ton | Die Tokioter Abfahrtsmelodien sind urheberrechtlich geschützt; privat abspielen ist unkritisch, im Repo verbreiten nicht. |
+| Alarmton | Datei in Application Support, ersatzweise ein zur Laufzeit erzeugter Ton | Die Tokioter Abfahrtsmelodien sind urheberrechtlich geschützt; privat abspielen ist unkritisch, im Repo verbreiten nicht. |
 | Lautstärke | Systemlautstärke temporär anheben, danach wiederherstellen | Volle App-Lautstärke allein bleibt bei leisem Mac unhörbar. |
 | Projektsetup | SPM plus `make bundle` | Git-freundlich und ohne Xcode baubar; EventKit verlangt trotzdem ein signiertes App-Bundle. |
 
@@ -97,14 +97,33 @@ Prozess untätig.
 ### Filterregeln (Opt-out)
 
 1. Nur Termine aus abonnierten Kalendern.
-2. Stummgeschaltetes entfällt: einzelner Termin über seine Event-ID, ganze Serie über
-   `calendarItemExternalIdentifier`, womit alle künftigen Vorkommen still sind.
+2. Stummgeschaltetes entfällt: einzelnes Vorkommen über seine Vorkommens-Kennung,
+   ganze Serie über `calendarItemExternalIdentifier`, womit alle künftigen Vorkommen
+   still sind.
 3. Grundsätzlich ausgeblendet, weil ein Alarm dort sinnlos ist:
    - ganztägige Termine — kein sinnvoller Startzeitpunkt,
    - abgesagte Termine,
    - explizit abgelehnte Termine.
 
    Zugesagte und unbeantwortete Termine alarmieren beide.
+
+### Vorkommens-Kennung
+
+Ein Vorkommen wird **nicht** allein über `eventIdentifier` identifiziert. Bei
+Serienterminen gehört dieser Wert der ganzen Serie: Alle Vorkommen teilen sich
+denselben. Am echten Kalender des Nutzers gemessen ergaben 40 Termine nur 21
+verschiedene Kennungen.
+
+Die Kennung ist deshalb das Paar aus `eventIdentifier` und dem Beginn des
+Vorkommens, geschrieben als ganze Sekunden seit 1970 — damit ist sie bei jedem Scan
+bitgleich und unabhängig von Locale, Zeitzone und Fließkomma-Formatierung. Ohne den
+Startzeitpunkt würde ein einmal weggeklickter Alarm die komplette Serie stummschalten,
+und „dieses eine Vorkommen" wäre nicht mehr von „die ganze Serie" zu unterscheiden.
+Bitte nicht vereinfachen.
+
+Apple dokumentiert `eventIdentifier` ausdrücklich als über eine Synchronisation hinweg
+veränderlich. Wird ein Termin anderswo bearbeitet, kann eine Stummschaltung oder ein
+abgestellter Alarm dadurch verlorengehen.
 
 ### Planung
 
@@ -113,22 +132,47 @@ auf `Start − Vorlaufzeit` (Standard: 2 Minuten, einstellbar). Nach jedem Alarm
 jedem Scan wird neu gesetzt.
 
 Liegen zwei Termine dicht beieinander, überschreibt der zweite den laufenden Alarm
-nicht. Er reiht sich an und erscheint, sobald der erste abgestellt ist.
+nicht. Ob er danach noch kommt, entscheidet dieselbe Regel wie überall: Alarmiert wird
+ein Termin nur, solange er noch nicht begonnen hat oder höchstens `catchUpGrace`
+(Standard: 120 Sekunden) zurückliegt. Wird der erste Alarm später abgestellt, entfällt
+der zweite still.
+
+Das ist keine Panne, sondern dieselbe Regel, die verhindert, dass ein zehn Minuten
+alter Termin nach dem Aufklappen des Deckels noch losschreit. Wer ein längeres Fenster
+möchte, stellt `catchUpGrace` hoch.
 
 ### Nur bei aktivem Rechner
 
 Schläft der Rechner oder ist der Deckel geschlossen, feuert kein Alarm; alarmooh
-weckt den Rechner auch nicht. Der Zustand wird über die Schlaf- und
-Aufwach-Benachrichtigungen von `NSWorkspace` verfolgt.
+weckt den Rechner auch nicht. Geprüft wird beim Auslösen über `CGDisplayIsAsleep`;
+läuft der Timer währenddessen ab, verfällt der Alarm und wird beim Aufwachen neu
+bewertet. Die Aufwach-Benachrichtigungen von `NSWorkspace` stoßen dafür einen Scan an.
 
 Beim Aufwachen wird ein verpasster Alarm nur nachgeholt, wenn der Termin noch nicht
-begonnen hat oder höchstens zwei Minuten läuft. Alles Ältere verfällt still.
+begonnen hat oder höchstens `catchUpGrace` (Standard: 2 Minuten) zurückliegt. Alles
+Ältere verfällt still.
 
 ### Meeting-Link
 
 Gesucht wird in dieser Reihenfolge: URL-Feld des Termins, Notizen, Ortsfeld.
-Erkannt werden Google Meet, Zoom, Teams und Whereby, ersatzweise die erste beliebige
-`https://`-URL. Ohne Fund zeigt das Panel nur den Stumm-Button.
+Als Anbieter erkannt werden Google Meet, Zoom, Zoom Gov, Teams, Whereby, Webex,
+GoToMeeting, Jitsi, BlueJeans, Chime, RingCentral, Around, Discord und Slack,
+ersatzweise die erste beliebige `http(s)`-URL. Ohne Fund zeigt das Panel nur den
+Stumm-Button.
+
+Drei Regeln greifen davor, weil der Knopf „Beitreten" heißt und den Alarm abstellt —
+ein Abmeldelink an dieser Stelle wäre fatal:
+
+- Was erkennbar kein Beitreten-Link ist, fällt zuerst weg: Abmelde- und
+  Opt-out-Adressen, Einwahlnummern, Hilfeseiten, Links auf Besprechungsoptionen.
+- HTML-Entities aus Outlook-Einladungen werden aufgelöst; sonst bricht ein
+  Zoom-Link mit `&amp;` im Parameterteil beim Öffnen ab.
+- Übernommen wird nur, was im Text tatsächlich mit `http://` oder `https://` begann.
+  Der Link-Detektor erkennt sonst auch eine bloß erwähnte Domain, und die stünde dann
+  auf dem Beitreten-Knopf.
+
+Bekannte Grenze: Eine URL, die ein Mailprogramm über zwei Zeilen umgebrochen hat, wird
+nicht zusammengesetzt.
 
 ## Menüleiste, Alarm-Fenster, Ton
 
@@ -155,7 +199,17 @@ Inhalt: Terminname groß, darunter Startzeit und Kalendername, dann die Aktionen
 - **Stumm** — beendet den Alarm. Immer vorhanden.
 - **Diese Serie nie wieder** — schreibt die Serie direkt in die Mute-Liste.
 
-`ESC` und ein Klick aufs Menüleisten-Icon beenden den Alarm ebenfalls.
+Abgestellt wird der Alarm ausschließlich über diese drei Knöpfe. Sie funktionieren,
+ohne dass das Fenster den Fokus übernimmt.
+
+`ESC` und ein Klick aufs Menüleisten-Icon tun es nicht — beides war vorgesehen und ist
+technisch nicht möglich:
+
+- Das Panel ist ein `nonactivatingPanel` und wird mit `orderFrontRegardless()`
+  gezeigt. Es wird nie Key-Window, also feuert SwiftUIs
+  `keyboardShortcut(.cancelAction)` dort nie.
+- Sobald ein `NSStatusItem` ein Menü hat, öffnet ein Klick aufs Icon das Menü. Die
+  Button-Action läuft dann gar nicht mehr an.
 
 ### Ton und Lautstärke
 
@@ -173,8 +227,15 @@ wiederhergestellt.
 
 Die App nutzt die Audiodatei in `~/Library/Application Support/alarmooh/`. Der Nutzer
 legt sie dort ab oder wählt sie einmalig im Einstellungsfenster. Im Repository liegt
-nur ein schlichter, selbst erzeugter Fallback-Ton; das Audio-Verzeichnis ist
-gitignored.
+keine Audiodatei; der Ersatzton wird beim ersten Alarm erzeugt und daneben abgelegt.
+
+Der Ersatzton besteht aus zwei gehaltenen Tönen, 987,77 Hz und 659,25 Hz, je 0,55
+Sekunden, Spitze 0,95, gemessener RMS 0,66. Attack und Release sind kurze Rampen,
+damit weder der Notenwechsel noch die Schleifennaht klickt. Er klingt bewusst nicht
+ab: Eine abklingende Hüllkurve klingt hübscher, verbringt aber den größten Teil der
+Note nahe null und geht im Gespräch oder unter Kopfhörern unter. Das hier ist ein
+Wecker, kein Gong. Es ist ein reines Sinuspaar — reicht die Durchsetzungskraft immer
+noch nicht, wären Obertöne der nächste Schritt.
 
 Hintergrund: Die Tokioter Abfahrtsmelodien sind komponierte, geschützte Werke. Privat
 abspielen ist unkritisch, sie ins Repository zu legen und weiterzugeben wäre es nicht.
@@ -185,11 +246,27 @@ abspielen ist unkritisch, sie ins Repository zu legen und weiterzugeben wäre es
 beschreibbar, statt `UserDefaults`:
 
 - abonnierte Kalender-IDs
-- Mute-Liste (Event-IDs und Serien-IDs)
+- Mute-Liste (Vorkommens-Kennungen und Serien-IDs)
 - Vorlaufzeit
 - Mindestlautstärke
 - Sound-Pfad
 - Scan-Intervall
+- Nachholfrist (`catchUpGrace`)
+
+Die Datei ist ausdrücklich von Hand editierbar, und das hat zwei Konsequenzen, die im
+Code stehen müssen:
+
+- Swifts synthetisiertes `Codable` ignoriert Standardwerte und macht jeden
+  nicht-optionalen Schlüssel zur Pflicht. Ein einziger fehlender Schlüssel hätte die
+  ganze Datei unlesbar gemacht — und mit leerer Liste abonnierter Kalender alarmiert
+  nichts mehr. `Settings` dekodiert deshalb jeden Schlüssel einzeln mit Rückfall auf
+  den Standardwert und klemmt unsinnige Werte (negative Vorlaufzeit, Lautstärke
+  außerhalb 0…1, Scan-Intervall unter einer Minute).
+- `SettingsStore` unterscheidet die fehlende von der defekten Datei. Fehlt sie, gelten
+  Standardwerte. Ist sie da, aber unlesbar, wird sie nicht überschrieben — eine von
+  Hand geschriebene Konfiguration soll ein Tippfehler nicht vernichten. Der Zustand
+  ist über `lastLoadFailed` abfragbar, damit der Nutzer gewarnt werden kann, statt
+  still ohne Abos weiterzulaufen.
 
 Das Einstellungsfenster (SwiftUI in einem normalen Fenster) bietet: Kalenderliste mit
 Häkchen, Vorlaufzeit, Mindestlautstärke als Regler, Sound-Auswahl, die Mute-Liste mit
@@ -221,6 +298,10 @@ Bei Ad-hoc-Signatur ändert sich die Code-Identität mit jedem Build, weshalb ma
 Kalenderfrage gelegentlich erneut stellt. Ein einmalig angelegtes selbstsigniertes
 Zertifikat im Schlüsselbund behebt das, falls es stört.
 
+Stolperstein beim Übersetzen: `SystemVolumeController` braucht neben `CoreAudio` auch
+`import AudioToolbox`. `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` liegt
+dort, nicht in `CoreAudio`.
+
 ## Tests
 
 `swift test` gegen `AlarmoohCore`, ohne Xcode, mit `FakeCalendarSource`:
@@ -228,16 +309,42 @@ Zertifikat im Schlüsselbund behebt das, falls es stört.
 **Filter** — ganztägig entfällt, abgelehnt entfällt, stummgeschaltete Serie entfällt,
 Termin aus abonniertem Kalender bleibt.
 
-**Link-Extraktion** — Meet, Zoom, Teams aus URL-Feld, Notizen und Ort; ohne Link `nil`.
+**Link-Extraktion** — Meet, Zoom, Teams aus URL-Feld, Notizen und Ort; ohne Link `nil`;
+Anbieter schlägt Abmeldelink; HTML-Entities; bloße Domain im Fließtext ist kein Link.
 
 **Scheduler** — nächster Termin korrekt gewählt; dicht aufeinanderfolgende Termine;
 verpasster Alarm wird nach dem Aufwachen nur innerhalb der Nachholfrist ausgelöst;
 vergangene Termine lösen nicht aus.
 
-Panel, Audio und Lautstärkesteuerung bleiben ungetestet und werden von Hand geprüft —
-ein Mock-Gerüst lohnt dafür nicht.
+**Einstellungen** — leeres und unvollständiges JSON ergeben Standardwerte, unbekannte
+Schlüssel stören nicht, unsinnige Werte werden geklemmt, eine defekte Datei wird
+gemeldet und nicht überschrieben.
+
+**Ersatzton** — abspielbar, und die Samples belegen Pegel und klickfreie Ränder. Der
+Test fällt, sobald jemand die Sustain-Hüllkurve wieder gegen ein Abklingen tauscht.
+
+Panel, Menüleiste und die CoreAudio-Anbindung bleiben ungetestet und werden von Hand
+geprüft — ein Mock-Gerüst lohnt dafür nicht. Der Lautstärke-Snapshot, der einen
+Absturz überleben muss, ist dagegen getestet.
 
 ## Bewusst weggelassen
 
 Snooze, Auto-Timeout des Tons, mehrere Sounds pro Kalender, Kalender-Schreibzugriff,
 Countdown in der Menüleiste, Google-Calendar-API als zweite Quelle.
+
+## Bekannte Grenzen
+
+Was die Implementierung nicht abdeckt:
+
+- Abgestellte Alarme merkt sich nur der laufende Prozess. Startet die App innerhalb
+  der Vorlaufzeit neu, kann derselbe Alarm ein zweites Mal kommen.
+- `events(matching:)` von EventKit ist synchron und läuft auf dem Hauptthread.
+  Gemessen 5–48 ms für das 24-Stunden-Fenster — bei dieser Größenordnung
+  unproblematisch, aber nach oben nicht begrenzt.
+- Die Ad-hoc-Signatur ändert die App-Identität bei jedem Build, macOS kann die
+  Kalenderberechtigung deshalb erneut abfragen.
+- Abgesagt wird über den Teilnehmer mit `isCurrentUser` erkannt. Am Kalender des
+  Nutzers gemessen hatten 4 von 40 Terminen Teilnehmer, aber keinen solchen Treffer;
+  eine Absage unter einer zweiten Adresse bleibt dann unbemerkt.
+- Wird das Ausgabegerät gewechselt, während der Alarm läuft, bleibt das ursprüngliche
+  Gerät auf der angehobenen Lautstärke stehen.
