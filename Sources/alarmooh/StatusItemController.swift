@@ -7,8 +7,6 @@ final class StatusItemController {
 
     var onOpenSettings: () -> Void = {}
     var onQuit: () -> Void = { NSApp.terminate(nil) }
-    /// Klick aufs Icon waehrend eines Alarms stellt ihn ab.
-    var onIconClickedDuringAlarm: (() -> Void)?
 
     init() {
         item.button?.image = NSImage(
