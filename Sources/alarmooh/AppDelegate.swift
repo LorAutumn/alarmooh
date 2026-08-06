@@ -22,11 +22,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             guard await source.requestAccess() else {
                 log.error("Kalenderzugriff verweigert")
-                statusItem.rebuildMenu(nextEvent: nil)
+                // Ohne Zugriff kann alarmooh gar nichts. Statt still im
+                // "Kein Termin"-Zustand zu verharren, sagt das Menue, was fehlt,
+                // und fuehrt direkt in die Systemeinstellungen.
+                statusItem.rebuildMenu(
+                    nextEvent: nil,
+                    warning: "Kein Kalenderzugriff — alarmooh kann nichts überwachen",
+                    warningAction: StatusItemController.WarningAction(
+                        title: "Kalenderzugriff in den Systemeinstellungen erlauben…",
+                        perform: Self.openCalendarPrivacySettings
+                    )
+                )
                 return
             }
             coordinator.start()
             log.info("alarmooh bereit")
         }
+    }
+
+    /// Datenschutz-Bereich "Kalender" der Systemeinstellungen.
+    private static func openCalendarPrivacySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 }

@@ -10,7 +10,7 @@ extension SettingsStoreError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .refusesToOverwriteUnreadableFile(let url):
-            return "Die Einstellungsdatei \(url.path) ist unlesbar und wird nicht ueberschrieben."
+            return "Die Einstellungsdatei \(url.path) ist unlesbar und wird nicht überschrieben."
         }
     }
 }

@@ -83,7 +83,7 @@ final class SettingsModel {
             settings.soundPath = target.path
             save()
         } catch {
-            saveError = "Ton nicht uebernommen: \(error.localizedDescription)"
+            saveError = "Ton nicht übernommen: \(error.localizedDescription)"
         }
     }
 
@@ -153,9 +153,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("settings.json ist defekt").bold()
                     Text(
-                        "Aenderungen in diesem Fenster koennen nicht gespeichert werden. "
-                        + "alarmooh laeuft mit dem zuletzt gueltigen Stand weiter. "
-                        + "Datei reparieren oder loeschen: \(SettingsStore.standard().fileURL.path)"
+                        "Änderungen in diesem Fenster können nicht gespeichert werden. "
+                        + "alarmooh läuft mit dem zuletzt gültigen Stand weiter. "
+                        + "Datei reparieren oder löschen: \(SettingsStore.standard().fileURL.path)"
                     )
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -179,7 +179,7 @@ struct SettingsView: View {
                     ))
                 }
             }
-            Text("Nur Termine aus angehakten Kalendern loesen einen Alarm aus.")
+            Text("Nur Termine aus angehakten Kalendern lösen einen Alarm aus.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if let saveError = model.saveError {
@@ -197,7 +197,7 @@ struct SettingsView: View {
     }
 
     private var volumeSection: some View {
-        Section("Mindestlautstaerke") {
+        Section("Mindestlautstärke") {
             HStack {
                 Slider(value: minimumVolume, in: 0...1) { editing in
                     // Erst beim Loslassen schreiben, sonst eine Datei pro Pixel.
@@ -208,7 +208,7 @@ struct SettingsView: View {
                     .frame(width: 48, alignment: .trailing)
             }
             Text(
-                "alarmooh hebt die Systemlautstaerke fuer die Dauer eines Alarms auf "
+                "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
                 + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her."
             )
             .font(.footnote)
@@ -225,11 +225,11 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Button("Datei waehlen…") { chooseSound() }
+                Button("Datei wählen…") { chooseSound() }
                 Button("Mitgelieferten Ton verwenden") { model.resetSound() }
                     .disabled(model.settings.soundPath == nil)
             }
-            Text("Die gewaehlte Datei wird nach ~/Library/Application Support/alarmooh/ kopiert, "
+            Text("Die gewählte Datei wird nach ~/Library/Application Support/alarmooh/ kopiert, "
                  + "damit der Alarm auch nach dem Verschieben des Originals funktioniert.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -270,7 +270,7 @@ struct SettingsView: View {
                 get: { model.settings.launchAtLogin },
                 set: { model.setLaunchAtLogin($0) }
             ))
-            Text("Zuverlaessig erst, wenn Alarmooh.app in /Applications liegt.")
+            Text("Zuverlässig erst, wenn Alarmooh.app in /Applications liegt.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if let loginError = model.loginError {
@@ -303,7 +303,7 @@ struct SettingsView: View {
         panel.allowedContentTypes = [.audio]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.prompt = "Waehlen"
+        panel.prompt = "Wählen"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.chooseSound(url)
     }

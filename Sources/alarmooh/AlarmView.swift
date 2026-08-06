@@ -6,6 +6,9 @@ struct AlarmView: View {
     let link: URL?
     let onJoin: (URL) -> Void
     let onDismiss: () -> Void
+    /// Nur dieses eine Vorkommen; es gibt jeden Termin, auch den einmaligen.
+    let onMuteEvent: () -> Void
+    /// Alle kuenftigen Vorkommen; nil, wenn der Termin zu keiner Serie gehoert.
     let onMuteSeries: (() -> Void)?
 
     private var timeText: String {
@@ -33,11 +36,16 @@ struct AlarmView: View {
                 Button("Stumm") { onDismiss() }
             }
 
-            if let onMuteSeries {
-                Button("Diese Serie nie wieder", action: onMuteSeries)
-                    .buttonStyle(.link)
-                    .font(.footnote)
+            // Nebeneinander, damit der Unterschied "nur dieser" gegen "alle"
+            // beim Lesen sofort da ist.
+            HStack(spacing: 12) {
+                Button("Diesen Termin nie wieder", action: onMuteEvent)
+                if let onMuteSeries {
+                    Button("Diese Serie nie wieder", action: onMuteSeries)
+                }
             }
+            .buttonStyle(.link)
+            .font(.footnote)
         }
         .padding(16)
         .frame(width: 320)

@@ -77,7 +77,7 @@ final class AlarmCoordinator {
 
     private var settingsWarning: String? {
         settingsFileBroken
-            ? "settings.json ist defekt — Aenderungen werden nicht gespeichert"
+            ? "settings.json ist defekt — Änderungen werden nicht gespeichert"
             : nil
     }
 
@@ -151,6 +151,10 @@ final class AlarmCoordinator {
                 self?.dismissAlarm()
             },
             onDismiss: { [weak self] in self?.dismissAlarm() },
+            onMuteEvent: { [weak self] in
+                self?.muteEvent(event.id)
+                self?.dismissAlarm()
+            },
             onMuteSeries: event.seriesID.map { seriesID in
                 { [weak self] in
                     self?.muteSeries(seriesID)
@@ -173,12 +177,23 @@ final class AlarmCoordinator {
 
     private func muteSeries(_ seriesID: String) {
         settings.mutedSeriesIDs.insert(seriesID)
+        persistMute()
+    }
+
+    /// Nur dieses eine Vorkommen. Die Kennung enthaelt den Startzeitpunkt,
+    /// kuenftige Vorkommen derselben Serie bleiben also scharf.
+    private func muteEvent(_ eventID: String) {
+        settings.mutedEventIDs.insert(eventID)
+        persistMute()
+    }
+
+    private func persistMute() {
         do {
             try settingsStore.save(settings)
             scan()
         } catch {
-            // Nicht verschlucken: die Serie bleibt fuer diese Sitzung stumm,
-            // aber der Nutzer muss sehen, dass es den Neustart nicht ueberlebt.
+            // Nicht verschlucken: die Stummschaltung gilt fuer diese Sitzung,
+            // aber der Nutzer muss sehen, dass sie den Neustart nicht ueberlebt.
             settingsFileBroken = true
             log.error("Stummschaltung nicht gespeichert: \(error.localizedDescription)")
             refresh()
