@@ -2,24 +2,25 @@ import AlarmoohCore
 import AppKit
 import OSLog
 
-let log = Logger(subsystem: "io.github.lorautumn.alarmooh", category: "startup")
+// NSLog erscheint auf macOS 26 nicht mehr im Unified Log; OSLog schon.
+let log = Logger(subsystem: "io.github.lorautumn.alarmooh", category: "app")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let source = EventKitCalendarSource()
+    // Lazy, damit das Menueleisten-Icon erst nach dem Start der App entsteht.
+    private lazy var statusItem = StatusItemController()
+    private lazy var coordinator = AlarmCoordinator(source: source, statusItem: statusItem)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
             guard await source.requestAccess() else {
                 log.error("Kalenderzugriff verweigert")
+                statusItem.rebuildMenu(nextEvent: nil)
                 return
             }
-            let calendars = (try? source.calendars()) ?? []
-            log.info("\(calendars.count) Kalender: \(calendars.map(\.title).joined(separator: ", "))")
-
-            let now = Date()
-            let events = (try? source.events(from: now, to: now.addingTimeInterval(86_400))) ?? []
-            log.info("\(events.count) Termine in den naechsten 24 h")
+            coordinator.start()
+            log.info("alarmooh bereit")
         }
     }
 }
