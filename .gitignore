@@ -1,0 +1,13 @@
+# Swift / SPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Build-Artefakte des Bundles
+*.app/
+
+# Alarmtöne (urheberrechtlich geschütztes Material gehört nicht ins Repo)
+Sounds/
+
+# macOS
+.DS_Store
