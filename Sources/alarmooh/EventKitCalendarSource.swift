@@ -33,7 +33,7 @@ final class EventKitCalendarSource: CalendarSource, @unchecked Sendable {
             .participantStatus == .declined
 
         return CalendarEvent(
-            id: event.eventIdentifier ?? UUID().uuidString,
+            id: occurrenceID(for: event),
             seriesID: event.hasRecurrenceRules ? event.calendarItemExternalIdentifier : nil,
             title: event.title ?? "Termin",
             start: event.startDate,
@@ -46,5 +46,29 @@ final class EventKitCalendarSource: CalendarSource, @unchecked Sendable {
             notes: event.notes,
             location: event.location
         )
+    }
+
+    /// Kennung eines einzelnen Vorkommens.
+    ///
+    /// WICHTIG, bitte nicht "vereinfachen": `eventIdentifier` gehoert bei
+    /// Serienterminen der ganzen Serie, nicht dem einzelnen Vorkommen. Alle
+    /// Termine einer Serie teilen sich denselben Wert. Ohne den Startzeitpunkt
+    /// im Schluessel wuerde ein einmal weggeklickter Alarm die komplette Serie
+    /// fuer immer stummschalten, und "dieses eine Vorkommen stummschalten"
+    /// waere nicht mehr von "ganze Serie stummschalten" zu unterscheiden.
+    /// Erst das Paar (eventIdentifier, startDate) ist eindeutig.
+    ///
+    /// Der Startzeitpunkt wird als ganze Sekunden seit 1970 geschrieben; damit
+    /// ist die Kennung bei jedem erneuten Scan bitgleich und haengt nicht von
+    /// Locale, Zeitzone oder der Double-Formatierung ab.
+    private static func occurrenceID(for event: EKEvent) -> String {
+        let start = Int(event.startDate.timeIntervalSince1970)
+        // Fehlt die Kennung (bisher nie beobachtet), nehmen wir die lokale
+        // Kennung; erst wenn auch die leer ist, bleibt nur eine Zufalls-UUID.
+        // Die ist bewusst der letzte Ausweg: sie aendert sich bei jedem Scan.
+        let base = event.eventIdentifier
+            ?? (event.calendarItemIdentifier.isEmpty ? nil : event.calendarItemIdentifier)
+            ?? UUID().uuidString
+        return "\(base)|\(start)"
     }
 }

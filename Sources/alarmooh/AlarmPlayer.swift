@@ -12,13 +12,19 @@ final class AlarmPlayer {
     func start(settings: Settings) {
         stop()
         guard let url = try? soundURL(for: settings) else { return }
-        volumeController.raise(to: settings.minimumVolume)
 
-        player = try? AVAudioPlayer(contentsOf: url)
-        player?.numberOfLoops = -1   // endlos, wie im Design festgelegt
-        player?.volume = 1.0
-        player?.prepareToPlay()
-        player?.play()
+        // Reihenfolge ist Absicht: erst den Player bauen, dann die Lautstaerke
+        // anheben. Scheitert das Laden (kaputte oder ausgetauschte Datei),
+        // bleibt die Systemlautstaerke unangetastet - sonst haetten wir ein
+        // lautes Geraet, das nichts abspielt und nichts mehr leiser dreht.
+        guard let newPlayer = try? AVAudioPlayer(contentsOf: url) else { return }
+        newPlayer.numberOfLoops = -1   // endlos, wie im Design festgelegt
+        newPlayer.volume = 1.0
+        newPlayer.prepareToPlay()
+
+        volumeController.raise(to: settings.minimumVolume)
+        player = newPlayer
+        newPlayer.play()
     }
 
     func stop() {
