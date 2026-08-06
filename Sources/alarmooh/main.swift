@@ -1,3 +1,1 @@
-import AlarmoohCore
-
-print(Alarmooh.name)
+print("alarmooh")
