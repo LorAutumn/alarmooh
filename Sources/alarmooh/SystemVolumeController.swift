@@ -10,6 +10,13 @@ import Foundation
 final class SystemVolumeController {
     private let snapshots = VolumeSnapshotStore.standard()
 
+    /// Zweite Kopie des Snapshots im Speicher. Das Schreiben der Datei kann
+    /// fehlschlagen (Platte voll, fehlende Rechte, Pfad ist ein Verzeichnis);
+    /// die Datei ist nur fuer den Absturzfall da, weil sie den Prozess
+    /// ueberlebt. Innerhalb einer Prozesslaufzeit macht erst diese Kopie
+    /// `restore()` verlaesslich.
+    private var activeSnapshot: VolumeSnapshot?
+
     /// Beim Start aufrufen: Falls ein Alarm durch einen Absturz beendet wurde,
     /// steht die Lautstaerke noch oben.
     func restoreAfterCrashIfNeeded() {
@@ -20,14 +27,16 @@ final class SystemVolumeController {
 
     func raise(to minimum: Float) {
         guard let current = currentSnapshot() else { return }
+        activeSnapshot = current
         try? snapshots.save(current)
         if current.muted { setMuted(false) }
         if current.volume < minimum { setVolume(minimum) }
     }
 
     func restore() {
-        guard let snapshot = snapshots.load() else { return }
+        guard let snapshot = activeSnapshot ?? snapshots.load() else { return }
         apply(snapshot)
+        activeSnapshot = nil
         snapshots.clear()
     }
 
