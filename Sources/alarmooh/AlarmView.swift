@@ -1,0 +1,44 @@
+import AlarmoohCore
+import SwiftUI
+
+struct AlarmView: View {
+    let event: CalendarEvent
+    let link: URL?
+    let onJoin: (URL) -> Void
+    let onDismiss: () -> Void
+    let onMuteSeries: (() -> Void)?
+
+    private var timeText: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: event.start)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(event.title)
+                .font(.title2.bold())
+                .lineLimit(2)
+            Text("\(timeText) · \(event.calendarTitle)")
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if let link {
+                    Button("Beitreten") { onJoin(link) }
+                        .keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent)
+                }
+                Button("Stumm") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+
+            if let onMuteSeries {
+                Button("Diese Serie nie wieder", action: onMuteSeries)
+                    .buttonStyle(.link)
+                    .font(.footnote)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+}
