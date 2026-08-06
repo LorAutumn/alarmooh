@@ -13,7 +13,9 @@ public struct CalendarInfo: Identifiable, Hashable, Codable, Sendable {
 
 /// Ein einzelnes Vorkommen eines Termins, losgeloest von EventKit.
 public struct CalendarEvent: Identifiable, Hashable, Sendable {
-    /// Kennung dieses Vorkommens (EventKit: eventIdentifier).
+    /// Kennung genau eines Vorkommens, nicht der Serie: der eventIdentifier
+    /// allein gehoert allen Vorkommen einer Serie und kollidiert daher.
+    /// Gebaut aus eventIdentifier plus Startzeitpunkt in EventKitCalendarSource.
     public let id: String
     /// Stabile Kennung der Serie (EventKit: calendarItemExternalIdentifier).
     /// Nil bei Einzelterminen ohne Serienbezug.

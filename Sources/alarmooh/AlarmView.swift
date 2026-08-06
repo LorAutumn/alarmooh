@@ -22,6 +22,8 @@ struct AlarmView: View {
             Text("\(timeText) · \(event.calendarTitle)")
                 .foregroundStyle(.secondary)
 
+            // Das Panel wird nie Key-Window (nonactivatingPanel, orderFrontRegardless),
+            // darum ist .defaultAction rein dekorativ. Geschlossen wird per Klick.
             HStack {
                 if let link {
                     Button("Beitreten") { onJoin(link) }
@@ -29,7 +31,6 @@ struct AlarmView: View {
                         .buttonStyle(.borderedProminent)
                 }
                 Button("Stumm") { onDismiss() }
-                    .keyboardShortcut(.cancelAction)
             }
 
             if let onMuteSeries {
