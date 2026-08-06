@@ -46,6 +46,19 @@ private func settings(leadTime: TimeInterval = 120, grace: TimeInterval = 120) -
     #expect(alarm?.fireDate == now)
 }
 
+@Test func eventStartedExactlyAtGraceBoundaryStillFires() {
+    // "Hoechstens zwei Minuten" schliesst die zwei Minuten ein.
+    let event = CalendarEvent.stub(start: now.addingTimeInterval(-120))
+    let alarm = AlarmScheduler.nextAlarm(events: [event], now: now, settings: settings(grace: 120))
+    #expect(alarm?.fireDate == now)
+}
+
+@Test func eventStartingExactlyNowFiresWithoutGrace() {
+    let event = CalendarEvent.stub(start: now)
+    let alarm = AlarmScheduler.nextAlarm(events: [event], now: now, settings: settings(grace: 0))
+    #expect(alarm?.fireDate == now)
+}
+
 @Test func eventStartedBeyondGraceIsDropped() {
     let event = CalendarEvent.stub(start: now.addingTimeInterval(-180))
     #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: settings()) == nil)

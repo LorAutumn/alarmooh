@@ -26,6 +26,11 @@ final class SystemVolumeController {
     }
 
     func raise(to minimum: Float) {
+        // Zweites `raise()` ohne `restore()` dazwischen: der gemerkte Zustand
+        // ist bereits der originale des Nutzers. Wuerden wir jetzt neu messen,
+        // schrieben wir die schon angehobene Lautstaerke als "vorher" fest und
+        // koennten sie nie wieder zuruecksetzen.
+        guard activeSnapshot == nil else { return }
         guard let current = currentSnapshot() else { return }
         activeSnapshot = current
         try? snapshots.save(current)

@@ -25,7 +25,10 @@ public enum AlarmScheduler {
     ) -> PendingAlarm? {
         events
             .filter { !handled.contains($0.id) }
-            .filter { $0.start > now.addingTimeInterval(-settings.catchUpGrace) }
+            // ">=", weil die Nachfrist "hoechstens" gilt: ein Termin, der genau
+            // `catchUpGrace` zurueckliegt, ist noch drin. Mit Grenze 0 faellt
+            // sonst auch ein Termin weg, der genau jetzt beginnt.
+            .filter { $0.start >= now.addingTimeInterval(-settings.catchUpGrace) }
             .sorted { $0.start < $1.start }
             .first
             .map { event in
