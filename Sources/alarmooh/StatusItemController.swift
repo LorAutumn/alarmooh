@@ -28,8 +28,13 @@ final class StatusItemController {
         item.button?.contentTintColor = alarming ? .systemRed : nil
     }
 
-    func rebuildMenu(nextEvent: CalendarEvent?) {
+    func rebuildMenu(nextEvent: CalendarEvent?, warning: String? = nil) {
         let menu = NSMenu()
+        if let warning {
+            // Ganz oben und ohne Aktion: reiner Hinweis, den man nicht uebersieht.
+            menu.addItem(withTitle: warning, action: nil, keyEquivalent: "")
+            menu.addItem(.separator())
+        }
         if let event = nextEvent {
             let formatter = DateFormatter()
             formatter.timeStyle = .short

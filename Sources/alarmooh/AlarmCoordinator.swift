@@ -22,11 +22,20 @@ final class AlarmCoordinator {
     private var scanTimer: Timer?
     private var activeAlarm: CalendarEvent?
 
+    /// Die Datei ist vorhanden, aber unlesbar. Dann wird weder geschrieben noch
+    /// nachgeladen — und der Nutzer muss es erfahren, sonst laeuft alarmooh
+    /// scheinbar normal weiter, waehrend jede Aenderung ins Leere geht.
+    private(set) var settingsFileBroken = false
+
     init(source: EventKitCalendarSource, statusItem: StatusItemController) {
         self.source = source
         self.statusItem = statusItem
         self.settings = settingsStore.load()
+        self.settingsFileBroken = settingsStore.lastLoadFailed
     }
+
+    /// Stand, den das Einstellungsfenster anzeigt.
+    var currentSettings: Settings { settings }
 
     func start() {
         // Muss vor jedem moeglichen Alarm laufen: laeuft es mitten im Alarm,
@@ -41,14 +50,51 @@ final class AlarmCoordinator {
 
     /// Ausgeloest durch: EventKit-Aenderung, Sicherheitstakt, Aufwachen.
     func scan() {
-        settings = settingsStore.load()
+        let loaded = settingsStore.load()
+        if settingsStore.lastLoadFailed {
+            // Bei defekter Datei liefert `load()` Standardwerte — und die haben
+            // keine abonnierten Kalender. Wuerden wir die uebernehmen, faende
+            // `EventFilter` nichts mehr und die App hoerte alle 30 Minuten aufs
+            // Neue lautlos auf zu alarmieren. Also den Stand im Speicher behalten.
+            settingsFileBroken = true
+        } else {
+            settings = loaded
+            settingsFileBroken = false
+        }
+        refresh()
+    }
+
+    /// Wendet die Einstellungen aus dem Speicher an, ohne die Datei zu lesen.
+    private func refresh() {
         let now = Date()
         let raw = (try? source.events(from: now, to: now.addingTimeInterval(86_400))) ?? []
         // Erst filtern, dann planen: der Scheduler kennt die Opt-out-Regeln nicht.
         events = EventFilter.alarmable(raw, settings: settings)
         forgetHandledEventsNoLongerRelevant()
-        statusItem.rebuildMenu(nextEvent: events.first)
+        statusItem.rebuildMenu(nextEvent: events.first, warning: settingsWarning)
         scheduleNextAlarm()
+    }
+
+    private var settingsWarning: String? {
+        settingsFileBroken
+            ? "settings.json ist defekt — Aenderungen werden nicht gespeichert"
+            : nil
+    }
+
+    /// Schreibt neue Einstellungen und wendet sie sofort an. Scheitert das
+    /// Schreiben, bleibt auch der Stand im Speicher unveraendert — sonst zeigte
+    /// das Fenster etwas an, das den naechsten Start nicht ueberlebt.
+    func apply(_ new: Settings) throws {
+        do {
+            try settingsStore.save(new)
+        } catch {
+            settingsFileBroken = true
+            refresh()
+            throw error
+        }
+        settings = new
+        settingsFileBroken = false
+        refresh()
     }
 
     /// Verhindert, dass die Menge der erledigten Alarme unbegrenzt waechst:
@@ -127,8 +173,16 @@ final class AlarmCoordinator {
 
     private func muteSeries(_ seriesID: String) {
         settings.mutedSeriesIDs.insert(seriesID)
-        try? settingsStore.save(settings)
-        scan()
+        do {
+            try settingsStore.save(settings)
+            scan()
+        } catch {
+            // Nicht verschlucken: die Serie bleibt fuer diese Sitzung stumm,
+            // aber der Nutzer muss sehen, dass es den Neustart nicht ueberlebt.
+            settingsFileBroken = true
+            log.error("Stummschaltung nicht gespeichert: \(error.localizedDescription)")
+            refresh()
+        }
     }
 
     // MARK: - Systemereignisse
