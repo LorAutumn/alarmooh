@@ -157,8 +157,8 @@ begonnen hat oder höchstens `catchUpGrace` (Standard: 2 Minuten) zurückliegt. 
 Gesucht wird in dieser Reihenfolge: URL-Feld des Termins, Notizen, Ortsfeld.
 Als Anbieter erkannt werden Google Meet, Zoom, Zoom Gov, Teams, Whereby, Webex,
 GoToMeeting, Jitsi, BlueJeans, Chime, RingCentral, Around, Discord und Slack,
-ersatzweise die erste beliebige `http(s)`-URL. Ohne Fund zeigt das Panel nur den
-Stumm-Button.
+ersatzweise die erste beliebige `http(s)`-URL. Ohne Fund fehlt im Panel der
+Beitreten-Knopf.
 
 Drei Regeln greifen davor, weil der Knopf „Beitreten" heißt und den Alarm abstellt —
 ein Abmeldelink an dieser Stelle wäre fatal:
@@ -179,7 +179,8 @@ nicht zusammengesetzt.
 ### Menüleisten-Icon
 
 Ein Template-Symbol (Glocke), das im Alarmzustand die Farbe wechselt. Das Menü zeigt
-den nächsten überwachten Termin mit Uhrzeit sowie „Einstellungen…" und „Beenden".
+den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst „Kein
+überwachter Termin") sowie „Einstellungen…" und „alarmooh beenden".
 Kein Dock-Icon und kein App-Switcher-Eintrag — geregelt über `LSUIElement`.
 
 ### Alarm-Fenster
@@ -197,10 +198,16 @@ Inhalt: Terminname groß, darunter Startzeit und Kalendername, dann die Aktionen
 
 - **Beitreten** — nur bei gefundenem Link. Öffnet die URL und stoppt den Ton in einem Klick.
 - **Stumm** — beendet den Alarm. Immer vorhanden.
-- **Diese Serie nie wieder** — schreibt die Serie direkt in die Mute-Liste.
+- **Diesen Termin nie wieder** — schreibt die Vorkommens-Kennung in `mutedEventIDs`.
+  Immer vorhanden, auch bei einmaligen Terminen. Betrifft nur dieses eine Vorkommen.
+- **Diese Serie nie wieder** — schreibt die Serien-ID in `mutedSeriesIDs`. Nur, wenn der
+  Termin zu einer Serie gehört. Betrifft alle künftigen Vorkommen.
 
-Abgestellt wird der Alarm ausschließlich über diese drei Knöpfe. Sie funktionieren,
-ohne dass das Fenster den Fokus übernimmt.
+Die beiden Nie-wieder-Aktionen stehen nebeneinander, damit der Unterschied „nur dieses
+Vorkommen" gegen „alle künftigen" beim Lesen sofort da ist.
+
+Abgestellt wird der Alarm ausschließlich über diese Knöpfe. Sie funktionieren, ohne dass
+das Fenster den Fokus übernimmt.
 
 `ESC` und ein Klick aufs Menüleisten-Icon tun es nicht — beides war vorgesehen und ist
 technisch nicht möglich:
@@ -348,3 +355,10 @@ Was die Implementierung nicht abdeckt:
   eine Absage unter einer zweiten Adresse bleibt dann unbemerkt.
 - Wird das Ausgabegerät gewechselt, während der Alarm läuft, bleibt das ursprüngliche
   Gerät auf der angehobenen Lautstärke stehen.
+- `mutedEventIDs` wächst unbegrenzt. Jedes stummgeschaltete Vorkommen legt einen
+  dauerhaften Eintrag an, dessen Kennung den Startzeitpunkt enthält; nichts entfernt
+  Einträge, deren Termin längst vorbei ist. In der Praxis sind das Bytes pro Jahr, aber
+  die Mute-Liste im Einstellungsfenster füllt sich langsam mit toten Einträgen.
+- Die Mute-Liste im Einstellungsfenster zeigt die rohen Vorkommens-Kennungen
+  (etwa `…|1754485200`). Für einen Menschen, der entscheiden will, was er wieder scharf
+  schaltet, sind die nicht lesbar.

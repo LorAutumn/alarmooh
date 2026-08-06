@@ -7,7 +7,8 @@ den lokalen Kalender — also das, was Kalender.app ohnehin schon synchronisiert
 schlägt standardmäßig zwei Minuten vor Terminbeginn mit einem schleifenden Signalton
 Alarm. Ein schwebendes Panel unter dem Menüleisten-Icon bietet dazu den Meeting-Link
 an: „Beitreten" öffnet ihn und stellt den Ton ab, „Stumm" stellt nur den Ton ab,
-„Diese Serie nie wieder" schaltet die ganze Serie dauerhaft still.
+„Diesen Termin nie wieder" legt dieses eine Vorkommen dauerhaft still und „Diese Serie
+nie wieder" alle künftigen Vorkommen der Serie.
 
 Kein Backend, kein Netzwerkzugriff, kein OAuth, keine Konten. Ein einzelner lokaler
 Prozess, der zwischen zwei Alarmen nichts tut: aus jedem Kalender-Scan entsteht genau
@@ -54,8 +55,9 @@ gleich.
 
 ## Einrichten
 
-1. Beim ersten Start fragt macOS nach Zugriff auf die Kalender. Ohne diesen Zugriff
-   zeigt das Menü nur „Kein ueberwachter Termin".
+1. Beim ersten Start fragt macOS nach Zugriff auf die Kalender. Wird er verweigert,
+   sagt das Menü das auch: „Kein Kalenderzugriff — alarmooh kann nichts überwachen",
+   darunter „Kalenderzugriff in den Systemeinstellungen erlauben…" als Direktlink.
 2. Über das Menüleisten-Icon „Einstellungen…" öffnen und **mindestens einen Kalender
    anhaken**.
 
@@ -63,9 +65,9 @@ Der zweite Schritt ist nicht optional: `subscribedCalendarIDs` ist im Auslieferu
 zustand leer, und ein leeres Abo bedeutet, dass **nichts** alarmiert. alarmooh läuft
 dann still in der Menüleiste und tut genau nichts.
 
-Innerhalb der abonnierten Kalender gilt Opt-out: Alles alarmiert, einzelne Serien
-lassen sich aus dem Alarm-Panel heraus stummschalten. Ganztägige, abgesagte und selbst
-abgelehnte Termine alarmieren grundsätzlich nie.
+Innerhalb der abonnierten Kalender gilt Opt-out: Alles alarmiert, einzelne Termine und
+ganze Serien lassen sich aus dem Alarm-Panel heraus stummschalten. Ganztägige, abgesagte
+und selbst abgelehnte Termine alarmieren grundsätzlich nie.
 
 Weiter im Einstellungsfenster:
 
@@ -78,7 +80,7 @@ Weiter im Einstellungsfenster:
 - **Bei Anmeldung starten** — über `SMAppService`. Zuverlässig erst, wenn
   `Alarmooh.app` in `/Applications` liegt.
 
-Der Ton läuft in Endlosschleife, bis einer der drei Knöpfe im Panel gedrückt wird. Es
+Der Ton läuft in Endlosschleife, bis einer der Knöpfe im Panel gedrückt wird. Es
 gibt bewusst kein Auto-Timeout und kein Snooze. Schläft der Rechner, feuert kein
 Alarm; alarmooh weckt ihn auch nicht.
 
@@ -145,10 +147,10 @@ sind nicht getestet und werden von Hand geprüft.
 
 - Abgestellte Alarme merkt sich nur der laufende Prozess. Wird alarmooh innerhalb der
   Vorlaufzeit neu gestartet, kann derselbe Alarm ein zweites Mal kommen.
-- Einzelne Vorkommen lassen sich in der Oberfläche nur wieder scharf schalten, nicht
-  stummschalten: Das Alarm-Panel bietet ausschließlich „Diese Serie nie wieder", und
-  das auch nur bei Serienterminen. Ein einzelner Termin landet nur durch Eintrag in
-  `mutedEventIDs` von Hand in der Mute-Liste.
+- `mutedEventIDs` wächst unbegrenzt: Jedes stummgeschaltete Vorkommen bleibt dauerhaft
+  eingetragen, auch wenn sein Termin längst vorbei ist. Die Mute-Liste im
+  Einstellungsfenster füllt sich dadurch mit toten Einträgen — und sie zeigt die rohen
+  Vorkommens-Kennungen (etwa `…|1754485200`), die für Menschen kaum lesbar sind.
 - Die Ad-hoc-Signatur ändert die App-Identität bei jedem Build; macOS fragt die
   Kalenderberechtigung deshalb gelegentlich erneut ab.
 - Wird das Ausgabegerät gewechselt, während ein Alarm läuft, bleibt das ursprüngliche
