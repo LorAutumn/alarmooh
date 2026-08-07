@@ -28,7 +28,24 @@ final class SettingsWindowController {
 
         // alarmooh ist eine Menueleisten-App ohne Dock-Icon; ohne dieses
         // Aktivieren erschiene das Fenster hinter dem, was gerade vorn ist.
-        NSApp.activate()
+        //
+        // Bewusst die veraltete Variante mit ignoringOtherApps: seit macOS 14
+        // ist NSApp.activate() kooperativ — es bittet nur um die Aktivierung
+        // und kehrt zurueck, bevor die App tatsaechlich aktiv ist. Das direkt
+        // danach folgende makeKeyAndOrderFront verliert dann das Rennen gegen
+        // das gerade aktive Programm; AppKit protokolliert "ordered front from
+        // a non-active application and may order beneath the active
+        // application's windows", und das Fenster erscheint dahinter.
+        // Gemessen (Harness mit zwei Durchgaengen, Finder davor aktiv):
+        // mit activate() blieb das Fenster jedes Mal hinter dem Finder und
+        // wurde nie Key; mit ignoringOtherApps: true war es jedes Mal ganz
+        // vorn und Key. Nur-Fenster-Tricks (orderFrontRegardless, Level
+        // .floating) schieben das Fenster zwar nach vorn, machen es aber nicht
+        // zum Key-Fenster — es klebt dann ueber dem aktiven Programm, ohne
+        // Tastatureingaben zu bekommen. Apple fuehrt ignoringOtherApps in der
+        // Dokumentation als veraltet; annotiert ist es nicht, der Compiler
+        // warnt also nicht.
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
