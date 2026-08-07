@@ -23,6 +23,6 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>alarmooh liest deine Termine, um dich rechtzeitig vor Meetings zu warnen.</string>
+	<string>alarmooh liest ausschließlich die Termine der von dir ausgewählten Kalender und ändert dort nichts; den Vollzugriff verlangt macOS, weil es keinen reinen Lesezugriff gibt. Dauerhaft gespeichert wird davon nur, welche Termine du stummgeschaltet hast.</string>
 </dict>
 </plist>

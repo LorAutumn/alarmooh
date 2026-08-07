@@ -70,7 +70,11 @@ public enum LinkExtractor {
         return rejectedFragments.contains { absolute.contains($0) }
     }
 
-    static func isKnownProvider(_ url: URL) -> Bool {
+    /// Oeffentlich, weil das Alarm-Panel einen bekannten Meeting-Anbieter von
+    /// einem beliebigen Host unterscheiden koennen muss, um vor einer fremden
+    /// Adresse zu warnen. Nur die Frage ist oeffentlich, nicht die Antwortliste:
+    /// `knownHosts` bleibt intern, die Ansicht hat sie nicht zu durchlaufen.
+    public static func isKnownProvider(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         return knownHosts.contains { host == $0 || host.hasSuffix(".\($0)") }
     }

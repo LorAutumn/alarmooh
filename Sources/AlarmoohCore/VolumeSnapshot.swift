@@ -3,10 +3,39 @@ import Foundation
 public struct VolumeSnapshot: Codable, Equatable, Sendable {
     public let volume: Float
     public let muted: Bool
+    /// Das Ausgabegeraet, zu dem `volume` und `muted` gehoeren — als stabile
+    /// Kennung (`kAudioDevicePropertyDeviceUID`), nicht als `AudioObjectID`.
+    /// Die numerischen IDs vergibt CoreAudio pro Systemstart neu und verwendet
+    /// sie wieder; ein Snapshot, der einen Neustart ueberlebt, koennte damit
+    /// auf ein voellig anderes Geraet passen.
+    ///
+    /// Optional aus zwei Gruenden: aeltere Dateien haben das Feld nicht, und
+    /// die Kennung ist nicht in jedem Fall lesbar. Beides bedeutet dasselbe —
+    /// das Geraet ist unbekannt.
+    public let deviceUID: String?
 
-    public init(volume: Float, muted: Bool) {
+    /// `deviceUID` hat einen Standardwert, damit ein Snapshot ohne bekanntes
+    /// Geraet weiterhin ohne Umstand entsteht.
+    public init(volume: Float, muted: Bool, deviceUID: String? = nil) {
         self.volume = volume
         self.muted = muted
+        self.deviceUID = deviceUID
+    }
+
+    /// Eigener Decoder aus demselben Grund wie in `Settings`: die Datei kann
+    /// aelter sein als der Code, der sie liest. Genau das ist hier der
+    /// Regelfall — eine `volume-snapshot.json`, die eine aeltere Version beim
+    /// Anheben geschrieben hat, kennt `deviceUID` nicht. Wuerde sie deshalb
+    /// unlesbar, bliebe die Lautstaerke nach einem Absturz oben, und der
+    /// Geraeteabgleich haette das Gegenteil dessen bewirkt, wofuer er da ist.
+    ///
+    /// `volume` und `muted` bleiben Pflicht: ohne sie gibt es nichts
+    /// wiederherzustellen, ein Standardwert waere geraten.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        volume = try container.decode(Float.self, forKey: .volume)
+        muted = try container.decode(Bool.self, forKey: .muted)
+        deviceUID = try container.decodeIfPresent(String.self, forKey: .deviceUID)
     }
 }
 

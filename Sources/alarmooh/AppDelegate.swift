@@ -16,6 +16,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settingsWindow = SettingsWindowController(
         coordinator: coordinator, source: source
     )
+    /// Eigener Zugang zur Systemlautstaerke, ausdruecklich neben dem des
+    /// Players im Koordinator. Er kennt keinen laufenden Alarm, sondern nur den
+    /// Snapshot auf der Platte — und genau der ist das, was ueber das Ende
+    /// eines Prozesses hinaus zaehlt. Beide Controller teilen sich diese Datei;
+    /// mehr Verbindung brauchen sie nicht.
+    private let volumeController = SystemVolumeController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Das Menueleisten-Icon ist die einzige Oberflaeche dieser App und
@@ -31,6 +37,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // den man weder befragen noch beenden kann. Die Reihenfolge hier ist
         // deshalb Teil der Funktion und keine Stilfrage.
         let statusItem = self.statusItem
+
+        // Gleich danach und ohne jede Bedingung: Endete der letzte Lauf mitten
+        // im Alarm, steht die Systemlautstaerke noch oben, und das Einzige, was
+        // davon weiss, ist die Snapshot-Datei.
+        //
+        // Bisher lief diese Wiederherstellung nur in `AlarmCoordinator.start()`
+        // — also erst im Erfolgszweig hinter `requestAccess()`. Wird der Zugriff
+        // verweigert, spaeter entzogen oder bleibt die Abfrage haengen (genau
+        // der Fall, der weiter unten beschrieben ist), wurde die Datei nie
+        // gelesen und die Lautstaerke blieb dauerhaft oben. Mit dem Kalender hat
+        // das Zuruecksetzen nichts zu tun: es liest eine Datei und schreibt
+        // hoechstens eine Lautstaerke.
+        //
+        // Zweimal laufen kann es deshalb nicht: `restoreAfterCrashIfNeeded`
+        // loescht die Datei, sobald sie angewandt ist, und `snapshots.load()`
+        // findet danach nichts mehr. Der Aufruf im Koordinator bleibt also
+        // stehen und wird wirkungslos — er kommt ohnehin spaeter und immer noch
+        // vor dem ersten moeglichen Alarm, trifft also nie einen lebenden
+        // Snapshot.
+        volumeController.restoreAfterCrashIfNeeded()
 
         // Auch ohne Kalenderzugriff erreichbar: dort steht, was alarmooh braucht.
         statusItem.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
@@ -70,6 +96,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             coordinator.start()
             log.info("alarmooh bereit")
         }
+    }
+
+    /// Das Anheben der Systemlautstaerke ist nur unter der Zusage vertretbar,
+    /// dass es immer zurueckgenommen wird. Beenden war die Luecke darin: „alarmooh
+    /// beenden" steht im Menue, ist die naheliegendste Reaktion auf einen Alarm,
+    /// den man loswerden will — und beendete den Prozess, ohne dass je ein
+    /// `restore()` lief. Zurueck blieb ein lautes Geraet.
+    ///
+    /// Ein eigenes Zuruecksetzen steht hier bewusst nicht: `AlarmPlayer.stop()`
+    /// stellt die Lautstaerke bereits selbst wieder her, und beide Wege unten
+    /// fuehren dorthin. Eine zweite Fassung derselben Regel liefe frueher oder
+    /// spaeter auseinander.
+    func applicationWillTerminate(_ notification: Notification) {
+        // Erst das Vorhoeren: auch der Testton hebt die Lautstaerke an. Laeuft
+        // daneben ein Alarm, gehoert der Snapshot ihm — `stopPreview()` weiss
+        // das und setzt dann nichts zurueck, weshalb dieser Aufruf vor dem
+        // naechsten stehen muss.
+        coordinator.stopPreviewSound()
+        // Dann der Alarm selbst, auf demselben Weg wie ein Klick auf „Stumm":
+        // Ton aus, Panel zu, Lautstaerke zurueck. Laeuft keiner, passiert nichts.
+        coordinator.dismissAlarm()
+        // Zuletzt die Datei. Sie deckt ab, was die beiden Aufrufe oben nicht
+        // erreichen — etwa einen Snapshot, dessen Besitzer diesen Prozess nicht
+        // ueberlebt hat. Nach einer erfolgreichen Wiederherstellung ist sie weg,
+        // dieser Aufruf also folgenlos.
+        volumeController.restore()
     }
 
     /// Datenschutz-Bereich "Kalender" der Systemeinstellungen.

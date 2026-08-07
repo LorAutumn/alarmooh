@@ -25,15 +25,50 @@ struct AlarmView: View {
             Text("\(timeText) · \(event.calendarTitle)")
                 .foregroundStyle(.secondary)
 
-            // Das Panel wird nie Key-Window (nonactivatingPanel, orderFrontRegardless),
-            // darum ist .defaultAction rein dekorativ. Geschlossen wird per Klick.
-            HStack {
-                if let link {
-                    Button("Beitreten") { onJoin(link) }
-                        .keyboardShortcut(.defaultAction)
-                        .buttonStyle(.borderedProminent)
+            // Knopf und Ziel gehoeren zusammen, darum enger gesetzt als der
+            // Abstand des umgebenden Stacks.
+            VStack(alignment: .leading, spacing: 6) {
+                // Das Panel wird nie Key-Window (nonactivatingPanel, orderFrontRegardless),
+                // darum ist .defaultAction rein dekorativ. Geschlossen wird per Klick.
+                HStack {
+                    if let link {
+                        Button("Beitreten") { onJoin(link) }
+                            .keyboardShortcut(.defaultAction)
+                            .buttonStyle(.borderedProminent)
+                    }
+                    Button("Stumm") { onDismiss() }
                 }
-                Button("Stumm") { onDismiss() }
+
+                // Titel, Notizen und URL stammen aus einer Einladung, die jeder
+                // schicken kann; der Link hinter "Beitreten" ist damit fremder
+                // Text. Unter laufendem Alarmton wird der Knopf im Reflex
+                // geklickt, also muss vorher sichtbar sein, wohin er fuehrt.
+                // Nur der Host: die volle URL waere fuer 320 pt zu lang und
+                // schoebe genau den beurteilbaren Teil aus dem Blick.
+                if let link, let host = link.host {
+                    Text("Ziel: \(host)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        // Vorne kuerzen, denn die aussagekraeftigen Labels
+                        // eines Hosts stehen hinten.
+                        .truncationMode(.head)
+                        .help(link.absoluteString)
+
+                    // Ein unbekannter Host ist kein Beweis fuer einen Angriff:
+                    // ein firmeninternes Meeting liegt zu Recht auf einer
+                    // eigenen Domain. Darum nur ein Hinweis, kein Sperren des
+                    // Knopfes. Die Warnung steht im Text, nicht in der Farbe
+                    // allein, sonst traegt sie fuer Farbfehlsichtige nichts.
+                    if !LinkExtractor.isKnownProvider(link) {
+                        Text("Unbekannter Anbieter — prüfe die Adresse.")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            // Eine Zeile bleibt eine Zeile: das Panel soll
+                            // unter laufendem Ton nicht in die Hoehe wachsen.
+                            .lineLimit(1)
+                    }
+                }
             }
 
             // Nebeneinander, damit der Unterschied "nur dieser" gegen "alle"
