@@ -123,7 +123,9 @@ final class AlarmCoordinator {
             join: { [weak self] url in
                 NSWorkspace.shared.open(url)
                 // Wer frueh beitritt, will spaeter keinen Alarm mehr — derselbe
-                // Weg wie im Panel, also nur dieses eine Vorkommen.
+                // Weg wie im Panel, also nur dieses eine Vorkommen. Laeutet es
+                // fuer genau diesen Termin schon, hoert es auf; darum das
+                // „Alarm entfällt" im Menuetext.
                 self?.muteEvent(event.id)
             },
             mute: { [weak self] in self?.muteEvent(event.id) }
@@ -311,15 +313,12 @@ final class AlarmCoordinator {
                 self?.dismissAlarm()
             },
             onDismiss: { [weak self] in self?.dismissAlarm() },
-            onMuteEvent: { [weak self] in
-                self?.muteEvent(event.id)
-                self?.dismissAlarm()
-            },
+            // Ohne eigenes `dismissAlarm`: Stummschalten beendet den laufenden
+            // Alarm seit jeher — nur steht das jetzt in `muteEvent` und
+            // `muteSeries` selbst und gilt damit auch fuer das Menue.
+            onMuteEvent: { [weak self] in self?.muteEvent(event.id) },
             onMuteSeries: event.seriesID.map { seriesID in
-                { [weak self] in
-                    self?.muteSeries(seriesID)
-                    self?.dismissAlarm()
-                }
+                { [weak self] in self?.muteSeries(seriesID) }
             }
         )
         panel.show(view: view, below: statusItem.iconFrameOnScreen)
@@ -367,16 +366,37 @@ final class AlarmCoordinator {
         persistLocalChange()
     }
 
+    /// Alle kuenftigen Vorkommen. Laeuft gerade ein Alarm dieser Serie, endet
+    /// er mit — Begruendung und Reihenfolge stehen bei `muteEvent`.
     private func muteSeries(_ seriesID: String) {
         settings.mutedSeriesIDs.insert(seriesID)
         persistLocalChange()
+        if activeAlarm?.seriesID == seriesID { dismissAlarm() }
     }
 
     /// Nur dieses eine Vorkommen. Die Kennung enthaelt den Startzeitpunkt,
     /// kuenftige Vorkommen derselben Serie bleiben also scharf.
+    ///
+    /// Trifft die Stummschaltung genau das Vorkommen, das gerade laeutet, endet
+    /// der Alarm sofort: Ton aus, Panel zu, Icon normal, Lautstaerke zurueck.
+    /// Das gilt fuer jeden Weg hierher — im Menue halten „Beitreten (Alarm
+    /// entfällt)" und „Für diesen Termin nicht alarmieren" damit auch waehrend
+    /// eines laufenden Alarms, was sie versprechen. Der Vergleich geht ueber die
+    /// Kennung des Vorkommens: wer aus dem Menue einen spaeteren Termin
+    /// stummschaltet, darf den laufenden Alarm nicht mit abwuergen.
+    ///
+    /// Erst speichern, dann abraeumen. `persistLocalChange` liest neu ein und
+    /// plant dabei den naechsten Alarm — solange `activeAlarm` noch steht, plant
+    /// `scheduleNextAlarm` aber gar nichts und laesst auch keinen alten Timer
+    /// stehen. Das abschliessende `dismissAlarm` raeumt Ton, Panel, Icon und den
+    /// Endtimer weg und plant danach aus der bereits aktualisierten Terminliste
+    /// neu, in der dieses Vorkommen nicht mehr auftaucht. Andersherum plante
+    /// `dismissAlarm` noch aus der alten Liste, und dass der Termin nicht sofort
+    /// erneut losginge, haenge allein an `handled`.
     private func muteEvent(_ eventID: String) {
         settings.mutedEventIDs.insert(eventID)
         persistLocalChange()
+        if activeAlarm?.id == eventID { dismissAlarm() }
     }
 
     /// Schreibt eine im Menue ausgeloeste Aenderung (Stummschaltung, Pause) und
