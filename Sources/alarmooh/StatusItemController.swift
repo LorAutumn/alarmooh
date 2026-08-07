@@ -7,6 +7,7 @@ final class StatusItemController {
 
     var onOpenSettings: () -> Void = {}
     var onQuit: () -> Void = { NSApp.terminate(nil) }
+    var onTogglePause: () -> Void = {}
 
     /// Anklickbarer Eintrag direkt unter einem Hinweis — fuer Faelle, in denen
     /// der Nutzer das Problem selbst beheben kann (fehlender Kalenderzugriff).
@@ -31,12 +32,12 @@ final class StatusItemController {
     /// ruft ueber Target/Action, nicht ueber die Closure.
     private var warningAction: WarningAction?
     private var nextEventActions: NextEventActions?
+    /// Letzter bekannter Pausenstand, damit das Icon auch dann stimmt, wenn nur
+    /// `setAlarming` laeuft und das Menue gar nicht neu gebaut wird.
+    private var paused = false
 
     init() {
-        item.button?.image = NSImage(
-            systemSymbolName: "bell.badge", accessibilityDescription: "alarmooh"
-        )
-        item.button?.image?.isTemplate = true
+        updateImage()
         rebuildMenu(nextEvent: nil)
     }
 
@@ -50,15 +51,41 @@ final class StatusItemController {
         item.button?.contentTintColor = alarming ? .systemRed : nil
     }
 
+    /// Das Symbol ist die einzige Anzeige, die man ohne Klick sieht. Ein
+    /// pausierter Wecker, den man fuer scharf haelt, ist der gefaehrlichste
+    /// Zustand dieser App — deshalb ein anderes Symbol, nicht nur ein Menuetext.
+    private func updateImage() {
+        let symbol = paused ? "bell.slash" : "bell.badge"
+        item.button?.image = NSImage(
+            systemSymbolName: symbol, accessibilityDescription: "alarmooh"
+        )
+        // Template bleibt Pflicht: nur so faerbt `contentTintColor` das Symbol
+        // waehrend eines laufenden Alarms rot.
+        item.button?.image?.isTemplate = true
+    }
+
     func rebuildMenu(
         nextEvent: CalendarEvent?,
         nextEventActions: NextEventActions? = nil,
+        paused: Bool = false,
         warning: String? = nil,
         warningAction: WarningAction? = nil
     ) {
         self.warningAction = warningAction
         self.nextEventActions = nextEventActions
+        if self.paused != paused {
+            self.paused = paused
+            updateImage()
+        }
         let menu = NSMenu()
+        if paused {
+            // Eigene Zeile statt `warning`: der Hinweiskanal ist fuer Stoerungen
+            // da und kann schon von "settings.json ist defekt" belegt sein. Beide
+            // muessen gleichzeitig sichtbar sein koennen, also zwei Zeilen. Stil
+            // und Platz sind dieselben: ganz oben, ohne Target und damit grau.
+            menu.addItem(withTitle: "Alarme sind ausgeschaltet", action: nil, keyEquivalent: "")
+            menu.addItem(.separator())
+        }
         if let warning {
             // Ganz oben und ohne Aktion: reiner Hinweis, den man nicht uebersieht.
             menu.addItem(withTitle: warning, action: nil, keyEquivalent: "")
@@ -97,6 +124,13 @@ final class StatusItemController {
             menu.addItem(withTitle: "Kein überwachter Termin", action: nil, keyEquivalent: "")
         }
         menu.addItem(.separator())
+        // Beschriftet mit der Aktion, nicht mit dem Zustand — den zeigt oben die
+        // eigene Zeile. So steht nie "Pause" da, waehrend Pause schon laeuft.
+        menu.addItem(
+            withTitle: paused ? "Alarme fortsetzen" : "Alarme pausieren",
+            action: #selector(MenuActions.togglePause), keyEquivalent: ""
+        ).target = actions
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Einstellungen…",
             action: #selector(MenuActions.openSettings), keyEquivalent: ","
@@ -116,6 +150,7 @@ final class StatusItemController {
         init(owner: StatusItemController) { self.owner = owner }
         @objc func openSettings() { owner?.onOpenSettings() }
         @objc func quit() { owner?.onQuit() }
+        @objc func togglePause() { owner?.onTogglePause() }
         @objc func runWarningAction() { owner?.warningAction?.perform() }
         @objc func joinNextEvent() {
             guard let next = owner?.nextEventActions, let link = next.link else { return }

@@ -19,6 +19,10 @@ public struct Settings: Codable, Equatable, Sendable {
     /// noch nachgeholt werden darf, gemessen ab Terminbeginn.
     public var catchUpGrace: TimeInterval = 120
     public var launchAtLogin: Bool = false
+    /// Alarme sind auf unbestimmte Zeit ausgesetzt. Bewusst kein Ablaufdatum:
+    /// der Nutzer schaltet selbst wieder ein. Weil der Wert in der Datei liegt,
+    /// ueberlebt die Pause auch den Neustart.
+    public var paused: Bool = false
 
     public init() {}
 
@@ -51,6 +55,9 @@ public struct Settings: Codable, Equatable, Sendable {
         launchAtLogin =
             try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin)
             ?? defaults.launchAtLogin
+        // Fehlt der Schluessel (Datei aus einer aelteren Version), gilt: nicht
+        // pausiert. Eine Datei ohne diesen Schluessel darf niemals stumm sein.
+        paused = try container.decodeIfPresent(Bool.self, forKey: .paused) ?? defaults.paused
 
         // Negativer Vorlauf hiesse: Alarm nach Terminbeginn.
         leadTime = max(

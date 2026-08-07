@@ -72,9 +72,12 @@ final class AlarmCoordinator {
         events = EventFilter.alarmable(raw, settings: settings)
         forgetHandledEventsNoLongerRelevant()
         let next = events.first
+        // Auch pausiert bleiben "Naechster: …", Beitreten und Stummschalten im
+        // Menue: wer die Alarme abgestellt hat, will trotzdem an sein Meeting.
         statusItem.rebuildMenu(
             nextEvent: next,
             nextEventActions: next.map(menuActions(for:)),
+            paused: settings.paused,
             warning: settingsWarning
         )
         scheduleNextAlarm()
@@ -197,35 +200,63 @@ final class AlarmCoordinator {
 
     func dismissAlarm() {
         guard let event = activeAlarm else { return }
+        // Weggedrueckt heisst erledigt: dieses Vorkommen laeutet nicht wieder.
         handled.insert(event.id)
+        stopActiveAlarm()
+        scheduleNextAlarm()   // ein direkt folgender Termin kommt jetzt dran
+    }
+
+    /// Beendet Ton und Panel, ohne das Vorkommen zu vermerken. Getrennt von
+    /// `dismissAlarm`, weil Pausieren den Alarm zwar abstellt, ihn aber nicht
+    /// als erledigt zaehlen darf.
+    private func stopActiveAlarm() {
+        guard activeAlarm != nil else { return }
         activeAlarm = nil
         player.stop()
         panel.close()
         statusItem.setAlarming(false)
-        scheduleNextAlarm()   // ein direkt folgender Termin kommt jetzt dran
+    }
+
+    // MARK: - Pause
+
+    /// Schaltet die Alarme ab oder wieder scharf — ohne Ablauf, der Nutzer
+    /// entscheidet selbst. Die eigentliche Regel steht in `AlarmScheduler`.
+    func togglePause() {
+        settings.paused.toggle()
+        if settings.paused {
+            // Das Menue ist auch waehrend eines laufenden Alarms erreichbar;
+            // sonst laeutete es nach dem Pausieren weiter. Bewusst ohne
+            // `handled`: nach dem Fortsetzen wird der Termin wieder normal
+            // behandelt, Pausieren ist kein Wegdruecken.
+            stopActiveAlarm()
+        }
+        log.info("Alarme \(self.settings.paused ? "pausiert" : "fortgesetzt")")
+        persistLocalChange()
     }
 
     private func muteSeries(_ seriesID: String) {
         settings.mutedSeriesIDs.insert(seriesID)
-        persistMute()
+        persistLocalChange()
     }
 
     /// Nur dieses eine Vorkommen. Die Kennung enthaelt den Startzeitpunkt,
     /// kuenftige Vorkommen derselben Serie bleiben also scharf.
     private func muteEvent(_ eventID: String) {
         settings.mutedEventIDs.insert(eventID)
-        persistMute()
+        persistLocalChange()
     }
 
-    private func persistMute() {
+    /// Schreibt eine im Menue ausgeloeste Aenderung (Stummschaltung, Pause) und
+    /// bewertet danach Menue und Timer neu.
+    private func persistLocalChange() {
         do {
             try settingsStore.save(settings)
             scan()
         } catch {
-            // Nicht verschlucken: die Stummschaltung gilt fuer diese Sitzung,
-            // aber der Nutzer muss sehen, dass sie den Neustart nicht ueberlebt.
+            // Nicht verschlucken: die Aenderung gilt fuer diese Sitzung, aber
+            // der Nutzer muss sehen, dass sie den Neustart nicht ueberlebt.
             settingsFileBroken = true
-            log.error("Stummschaltung nicht gespeichert: \(error.localizedDescription)")
+            log.error("Einstellung nicht gespeichert: \(error.localizedDescription)")
             refresh()
         }
     }

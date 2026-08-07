@@ -62,6 +62,15 @@ private func load(json: String) throws -> Settings {
     #expect(settings.launchAtLogin == Settings().launchAtLogin)
 }
 
+@Test func fileWithoutPausedKeyDecodesAsRunning() throws {
+    // Der Aufruestpfad: eine vor der Pause-Funktion geschriebene Datei.
+    // Sie darf die App auf keinen Fall stumm starten lassen.
+    let settings = try load(json: #"{"subscribedCalendarIDs": ["cal-work"], "leadTime": 120}"#)
+
+    #expect(settings.paused == false)
+    #expect(settings.subscribedCalendarIDs == ["cal-work"])
+}
+
 @Test func unknownKeyDoesNotBreakDecoding() throws {
     let settings = try load(json: #"{"leadTime": 60, "lieblingsfarbe": "blau"}"#)
     #expect(settings.leadTime == 60)

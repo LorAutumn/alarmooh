@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Auch ohne Kalenderzugriff erreichbar: dort steht, was alarmooh braucht.
         statusItem.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
+        statusItem.onTogglePause = { [weak self] in self?.coordinator.togglePause() }
 
         Task {
             guard await source.requestAccess() else {
@@ -27,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // und fuehrt direkt in die Systemeinstellungen.
                 statusItem.rebuildMenu(
                     nextEvent: nil,
+                    // Auch ohne Kalenderzugriff soll das Icon den Pausenstand
+                    // zeigen; `currentSettings` liest nur die Datei, ohne zu scannen.
+                    paused: coordinator.currentSettings.paused,
                     warning: "Kein Kalenderzugriff — alarmooh kann nichts überwachen",
                     warningAction: StatusItemController.WarningAction(
                         title: "Kalenderzugriff in den Systemeinstellungen erlauben…",

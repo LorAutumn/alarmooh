@@ -17,13 +17,20 @@ public enum AlarmScheduler {
     ///
     /// - `handled` enthaelt Termine, deren Alarm bereits lief und abgestellt wurde.
     /// - Termine, deren Beginn laenger als `catchUpGrace` zurueckliegt, entfallen.
+    /// - Ist `settings.paused` gesetzt, gibt es ueberhaupt keinen Alarm.
     public static func nextAlarm(
         events: [CalendarEvent],
         now: Date,
         settings: Settings,
         handled: Set<String> = []
     ) -> PendingAlarm? {
-        events
+        // Die eine Stelle, an der die Pause gilt. Sie gehoert hierher und nicht
+        // ins Menue: solange kein Alarm geplant wird, kann auch keiner aus einem
+        // anderen Weg (Scan, Aufwachen, Nachholfrist) doch noch losgehen.
+        // Wer Pausieren woanders nachbaut, macht es nur unvollstaendig.
+        guard !settings.paused else { return nil }
+
+        return events
             .filter { !handled.contains($0.id) }
             // ">=", weil die Nachfrist "hoechstens" gilt: ein Termin, der genau
             // `catchUpGrace` zurueckliegt, ist noch drin. Mit Grenze 0 faellt

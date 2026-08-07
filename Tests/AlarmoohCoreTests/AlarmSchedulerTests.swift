@@ -78,3 +78,35 @@ private func settings(leadTime: TimeInterval = 120, grace: TimeInterval = 120) -
 @Test func noEventsYieldsNoAlarm() {
     #expect(AlarmScheduler.nextAlarm(events: [], now: now, settings: settings()) == nil)
 }
+
+// MARK: - Pause
+
+@Test func pausedYieldsNoAlarmForUpcomingEvent() {
+    let event = CalendarEvent.stub(start: now.addingTimeInterval(600))
+    var paused = settings()
+    paused.paused = true
+
+    #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: paused) == nil)
+}
+
+@Test func resumingRestoresTheAlarm() {
+    let event = CalendarEvent.stub(id: "wieder-scharf", start: now.addingTimeInterval(600))
+    var s = settings()
+    s.paused = true
+    #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: s) == nil)
+
+    s.paused = false
+    let alarm = AlarmScheduler.nextAlarm(events: [event], now: now, settings: s)
+    #expect(alarm?.event.id == "wieder-scharf")
+    #expect(alarm?.fireDate == now.addingTimeInterval(480))
+}
+
+@Test func pausedAlsoSuppressesTheCatchUpAlarm() {
+    // Sonst holte der naechste Scan nach dem Aufwachen den Alarm nach,
+    // obwohl der Nutzer ausdruecklich pausiert hat.
+    let event = CalendarEvent.stub(start: now.addingTimeInterval(-60))
+    var paused = settings(grace: 120)
+    paused.paused = true
+
+    #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: paused) == nil)
+}
