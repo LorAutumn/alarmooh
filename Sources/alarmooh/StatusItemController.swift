@@ -15,9 +15,22 @@ final class StatusItemController {
         let perform: () -> Void
     }
 
-    /// Haelt die Aktion des zuletzt aufgebauten Menues am Leben; NSMenuItem
+    /// Was das Menue mit dem naechsten Termin anbieten kann. Beide Aktionen
+    /// betreffen ausdruecklich nur dieses eine Vorkommen, nie die Serie.
+    struct NextEventActions {
+        /// Gefundener Meeting-Link; nil, wenn der Termin keinen hergibt. Ohne
+        /// Link entfaellt der Beitreten-Eintrag, statt ins Leere zu zeigen.
+        let link: URL?
+        /// Link oeffnen und den Alarm fuer dieses Vorkommen abschalten.
+        let join: (URL) -> Void
+        /// Nur den Alarm fuer dieses Vorkommen abschalten.
+        let mute: () -> Void
+    }
+
+    /// Haelt die Aktionen des zuletzt aufgebauten Menues am Leben; NSMenuItem
     /// ruft ueber Target/Action, nicht ueber die Closure.
     private var warningAction: WarningAction?
+    private var nextEventActions: NextEventActions?
 
     init() {
         item.button?.image = NSImage(
@@ -39,10 +52,12 @@ final class StatusItemController {
 
     func rebuildMenu(
         nextEvent: CalendarEvent?,
+        nextEventActions: NextEventActions? = nil,
         warning: String? = nil,
         warningAction: WarningAction? = nil
     ) {
         self.warningAction = warningAction
+        self.nextEventActions = nextEventActions
         let menu = NSMenu()
         if let warning {
             // Ganz oben und ohne Aktion: reiner Hinweis, den man nicht uebersieht.
@@ -64,6 +79,20 @@ final class StatusItemController {
                 withTitle: "Nächster: \(event.title) um \(formatter.string(from: event.start))",
                 action: nil, keyEquivalent: ""
             )
+            if let nextEventActions {
+                // Frueh beigetreten heisst: der Alarm hat sich erledigt. Der
+                // Eintrag erscheint nur mit Link, sonst waere "Beitreten" leer.
+                if nextEventActions.link != nil {
+                    menu.addItem(
+                        withTitle: "Beitreten (Alarm entfällt)",
+                        action: #selector(MenuActions.joinNextEvent), keyEquivalent: ""
+                    ).target = actions
+                }
+                menu.addItem(
+                    withTitle: "Für diesen Termin nicht alarmieren",
+                    action: #selector(MenuActions.muteNextEvent), keyEquivalent: ""
+                ).target = actions
+            }
         } else {
             menu.addItem(withTitle: "Kein überwachter Termin", action: nil, keyEquivalent: "")
         }
@@ -88,5 +117,10 @@ final class StatusItemController {
         @objc func openSettings() { owner?.onOpenSettings() }
         @objc func quit() { owner?.onQuit() }
         @objc func runWarningAction() { owner?.warningAction?.perform() }
+        @objc func joinNextEvent() {
+            guard let next = owner?.nextEventActions, let link = next.link else { return }
+            next.join(link)
+        }
+        @objc func muteNextEvent() { owner?.nextEventActions?.mute() }
     }
 }

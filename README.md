@@ -7,8 +7,13 @@ den lokalen Kalender — also das, was Kalender.app ohnehin schon synchronisiert
 schlägt standardmäßig zwei Minuten vor Terminbeginn mit einem schleifenden Signalton
 Alarm. Ein schwebendes Panel unter dem Menüleisten-Icon bietet dazu den Meeting-Link
 an: „Beitreten" öffnet ihn und stellt den Ton ab, „Stumm" stellt nur den Ton ab,
-„Diesen Termin nie wieder" legt dieses eine Vorkommen dauerhaft still und „Diese Serie
-nie wieder" alle künftigen Vorkommen der Serie.
+„Diesen Termin nicht alarmieren" legt dieses eine Vorkommen dauerhaft still und „Diese
+Serie nie wieder" alle künftigen Vorkommen der Serie.
+
+Auch ohne Alarm lässt sich der nächste Termin schon im Menü erledigen: Wurde ein Link
+gefunden, öffnet ihn „Beitreten (Alarm entfällt)" und stellt denselben Termin still —
+wer früh beitritt, wird hinterher nicht doch noch angeschrien. „Für diesen Termin nicht
+alarmieren" tut dasselbe ohne Link; künftige Vorkommen der Serie bleiben scharf.
 
 Kein Backend, kein Netzwerkzugriff, kein OAuth, keine Konten. Ein einzelner lokaler
 Prozess, der zwischen zwei Alarmen nichts tut: aus jedem Kalender-Scan entsteht genau

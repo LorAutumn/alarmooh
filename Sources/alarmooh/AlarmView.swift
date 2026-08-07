@@ -39,7 +39,7 @@ struct AlarmView: View {
             // Nebeneinander, damit der Unterschied "nur dieser" gegen "alle"
             // beim Lesen sofort da ist.
             HStack(spacing: 12) {
-                Button("Diesen Termin nie wieder", action: onMuteEvent)
+                Button("Diesen Termin nicht alarmieren", action: onMuteEvent)
                 if let onMuteSeries {
                     Button("Diese Serie nie wieder", action: onMuteSeries)
                 }

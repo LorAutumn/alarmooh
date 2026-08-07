@@ -183,6 +183,14 @@ den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst 
 überwachter Termin") sowie „Einstellungen…" und „alarmooh beenden".
 Kein Dock-Icon und kein App-Switcher-Eintrag — geregelt über `LSUIElement`.
 
+Zum nächsten Termin kommen zwei Aktionen dazu:
+
+- **Beitreten (Alarm entfällt)** — nur, wenn für den Termin ein Link gefunden wurde.
+  Öffnet ihn und legt dieses eine Vorkommen still, damit frühes Beitreten nicht später
+  doch noch angeschrien wird.
+- **Für diesen Termin nicht alarmieren** — immer vorhanden, solange es einen nächsten
+  Termin gibt. Betrifft nur dieses eine Vorkommen; künftige der Serie bleiben scharf.
+
 ### Alarm-Fenster
 
 Ein `NSPanel` direkt unter dem Icon, positioniert über die Bildschirmkoordinaten des
@@ -198,12 +206,12 @@ Inhalt: Terminname groß, darunter Startzeit und Kalendername, dann die Aktionen
 
 - **Beitreten** — nur bei gefundenem Link. Öffnet die URL und stoppt den Ton in einem Klick.
 - **Stumm** — beendet den Alarm. Immer vorhanden.
-- **Diesen Termin nie wieder** — schreibt die Vorkommens-Kennung in `mutedEventIDs`.
+- **Diesen Termin nicht alarmieren** — schreibt die Vorkommens-Kennung in `mutedEventIDs`.
   Immer vorhanden, auch bei einmaligen Terminen. Betrifft nur dieses eine Vorkommen.
 - **Diese Serie nie wieder** — schreibt die Serien-ID in `mutedSeriesIDs`. Nur, wenn der
   Termin zu einer Serie gehört. Betrifft alle künftigen Vorkommen.
 
-Die beiden Nie-wieder-Aktionen stehen nebeneinander, damit der Unterschied „nur dieses
+Die beiden Stummschalt-Aktionen stehen nebeneinander, damit der Unterschied „nur dieses
 Vorkommen" gegen „alle künftigen" beim Lesen sofort da ist.
 
 Abgestellt wird der Alarm ausschließlich über diese Knöpfe. Sie funktionieren, ohne dass

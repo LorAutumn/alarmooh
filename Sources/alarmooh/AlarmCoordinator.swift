@@ -71,8 +71,29 @@ final class AlarmCoordinator {
         // Erst filtern, dann planen: der Scheduler kennt die Opt-out-Regeln nicht.
         events = EventFilter.alarmable(raw, settings: settings)
         forgetHandledEventsNoLongerRelevant()
-        statusItem.rebuildMenu(nextEvent: events.first, warning: settingsWarning)
+        let next = events.first
+        statusItem.rebuildMenu(
+            nextEvent: next,
+            nextEventActions: next.map(menuActions(for:)),
+            warning: settingsWarning
+        )
         scheduleNextAlarm()
+    }
+
+    /// Der Link wird hier bestimmt, nicht im Menue: `LinkExtractor` gehoert zur
+    /// Kalenderauswertung, und der Koordinator haelt ohnehin die gefilterte
+    /// Liste. So bleibt `StatusItemController` ein reiner Menuebauer.
+    private func menuActions(for event: CalendarEvent) -> StatusItemController.NextEventActions {
+        StatusItemController.NextEventActions(
+            link: LinkExtractor.meetingLink(in: event),
+            join: { [weak self] url in
+                NSWorkspace.shared.open(url)
+                // Wer frueh beitritt, will spaeter keinen Alarm mehr — derselbe
+                // Weg wie im Panel, also nur dieses eine Vorkommen.
+                self?.muteEvent(event.id)
+            },
+            mute: { [weak self] in self?.muteEvent(event.id) }
+        )
     }
 
     private var settingsWarning: String? {
