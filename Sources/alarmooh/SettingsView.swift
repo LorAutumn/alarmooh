@@ -69,8 +69,11 @@ final class SettingsModel {
             let directory = SettingsStore.supportDirectory()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             // Der erzeugte Ersatzton liegt im selben Verzeichnis und darf nicht
-            // von einer gleichnamigen Nutzerdatei ueberschrieben werden.
-            let name = url.lastPathComponent == "fallback-tone.wav"
+            // von einer gleichnamigen Nutzerdatei ueberschrieben werden - und
+            // umgekehrt. Der alte Name steht mit in der Liste, weil der Player
+            // eine liegengebliebene Datei dieses Namens loescht.
+            let reserved = ["fallback-tone-2.wav", "fallback-tone.wav"]
+            let name = reserved.contains(url.lastPathComponent)
                 ? "alarm-\(url.lastPathComponent)"
                 : url.lastPathComponent
             let target = directory.appendingPathComponent(name)

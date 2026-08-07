@@ -100,8 +100,10 @@ Alarm; alarmooh weckt ihn auch nicht.
 ## Eigener Alarmton
 
 Im Repository liegt keine Audiodatei. Beim ersten Alarm erzeugt alarmooh sich selbst
-einen Ersatzton — zwei gehaltene Töne (H5, E5), je 0,55 Sekunden — und legt ihn als
-`fallback-tone.wav` neben die Einstellungen.
+einen Ersatzton — fünf aufsteigende Töne einer Pentatonik (E5, G5, A5, C6, D6),
+zusammen 2,4 Sekunden — und legt ihn als `fallback-tone-2.wav` neben die Einstellungen.
+Er darf freundlich klingen: Der Ton läuft ohnehin in Endlosschleife, die Dringlichkeit
+liefert also die Wiederholung und nicht die Klangfarbe.
 
 Ein eigener Ton wird im Einstellungsfenster unter „Alarmton" ausgewählt. Die Datei
 wird dabei nach `~/Library/Application Support/alarmooh/` kopiert, nicht bloß
@@ -123,7 +125,7 @@ Alles liegt in `~/Library/Application Support/alarmooh/`:
   werden geklemmt, unbekannte Schlüssel stören nicht. Ist die Datei dagegen kaputt,
   wird sie nicht überschrieben; alarmooh läuft mit dem zuletzt gültigen Stand weiter
   und warnt im Menü und im Einstellungsfenster.
-- `fallback-tone.wav` beziehungsweise die kopierte eigene Tondatei.
+- `fallback-tone-2.wav` beziehungsweise die kopierte eigene Tondatei.
 - `volume-snapshot.json` — die Lautstärke vor dem Alarm. Existiert nur, solange ein
   Alarm läuft, oder nach einem Absturz während eines Alarms; beim nächsten Start wird
   daraus die alte Lautstärke wiederhergestellt und die Datei gelöscht.

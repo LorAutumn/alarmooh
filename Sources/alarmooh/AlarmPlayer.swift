@@ -42,7 +42,11 @@ final class AlarmPlayer {
         if let path = settings.soundPath, FileManager.default.fileExists(atPath: path) {
             return URL(fileURLWithPath: path)
         }
-        let fallback = SettingsStore.supportDirectory().appendingPathComponent("fallback-tone.wav")
+        let support = SettingsStore.supportDirectory()
+        // Neuer Name, weil der Ersatzton nur erzeugt wird, wenn die Datei fehlt:
+        // wer den alten Ton schon einmal gehoert hat, behielte ihn sonst ewig.
+        try? FileManager.default.removeItem(at: support.appendingPathComponent("fallback-tone.wav"))
+        let fallback = support.appendingPathComponent("fallback-tone-2.wav")
         if !FileManager.default.fileExists(atPath: fallback.path) {
             try FileManager.default.createDirectory(
                 at: fallback.deletingLastPathComponent(), withIntermediateDirectories: true

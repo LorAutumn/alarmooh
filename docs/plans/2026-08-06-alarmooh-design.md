@@ -244,13 +244,26 @@ Die App nutzt die Audiodatei in `~/Library/Application Support/alarmooh/`. Der N
 legt sie dort ab oder wählt sie einmalig im Einstellungsfenster. Im Repository liegt
 keine Audiodatei; der Ersatzton wird beim ersten Alarm erzeugt und daneben abgelegt.
 
-Der Ersatzton besteht aus zwei gehaltenen Tönen, 987,77 Hz und 659,25 Hz, je 0,55
-Sekunden, Spitze 0,95, gemessener RMS 0,66. Attack und Release sind kurze Rampen,
-damit weder der Notenwechsel noch die Schleifennaht klickt. Er klingt bewusst nicht
-ab: Eine abklingende Hüllkurve klingt hübscher, verbringt aber den größten Teil der
-Note nahe null und geht im Gespräch oder unter Kopfhörern unter. Das hier ist ein
-Wecker, kein Gong. Es ist ein reines Sinuspaar — reicht die Durchsetzungskraft immer
-noch nicht, wären Obertöne der nächste Schritt.
+Der Ersatzton besteht aus fünf aufsteigenden Tönen einer Pentatonik — E5, G5, A5, C6,
+D6 —, die sich überlappen und zusammen 2,4 Sekunden ergeben. Jede Note ist ein Sinus
+plus ein leiser zweiter Oberton, beide exponentiell abklingend; alle Noten werden
+summiert und die Summe auf Spitze 0,85 normalisiert, gemessener RMS 0,17.
+
+Die Dringlichkeit liefert die Wiederholung, nicht die Klangfarbe: Der Ton läuft in
+Endlosschleife, bis der Nutzer ihn abstellt, und darf deshalb freundlich klingen. Die
+frühere Fassung hielt zwei Töne fast durchgängig auf voller Amplitude und tauschte
+damit ein Glöckchen gegen eine Sirene — der falsche Tausch.
+
+Jede Note bekommt neben dem kurzen Einsatz eine eigene Ausblendung von 90 ms. Die muss
+bleiben: Ohne sie bricht die Note mitten im Ausklingen bei rund 11 % Amplitude ab, und
+das knackt hörbar. Messbar ist es an der zweiten Differenz des Signals, deren Maximum
+ohne Rampe das 15-fache des Mittelwerts erreichte, und zwar genau an den Notenenden;
+mit Rampe bleiben 9 übrig, also nur noch die natürliche Krümmung der hohen Töne.
+
+Weil der Ersatzton nur erzeugt wird, wenn die Datei noch fehlt, heißt sie seit dieser
+Fassung `fallback-tone-2.wav`; sonst behielte jeder, der den alten Ton schon einmal
+gehört hat, ihn für immer. Eine liegengebliebene `fallback-tone.wav` wird dabei
+gelöscht.
 
 Hintergrund: Die Tokioter Abfahrtsmelodien sind komponierte, geschützte Werke. Privat
 abspielen ist unkritisch, sie ins Repository zu legen und weiterzugeben wäre es nicht.
@@ -344,7 +357,8 @@ Schlüssel stören nicht, unsinnige Werte werden geklemmt, eine defekte Datei wi
 gemeldet und nicht überschrieben.
 
 **Ersatzton** — abspielbar, und die Samples belegen Pegel und klickfreie Ränder. Der
-Test fällt, sobald jemand die Sustain-Hüllkurve wieder gegen ein Abklingen tauscht.
+Test fällt, sobald jemand den Ton leise dreht; zusätzlich prüft er über die zweite
+Differenz, dass die Ausblendung je Note nicht wegrationalisiert wurde.
 
 Panel, Menüleiste und die CoreAudio-Anbindung bleiben ungetestet und werden von Hand
 geprüft — ein Mock-Gerüst lohnt dafür nicht. Der Lautstärke-Snapshot, der einen
