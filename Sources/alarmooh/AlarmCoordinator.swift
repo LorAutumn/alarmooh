@@ -108,15 +108,54 @@ final class AlarmCoordinator {
     /// Schreibt neue Einstellungen und wendet sie sofort an. Scheitert das
     /// Schreiben, bleibt auch der Stand im Speicher unveraendert — sonst zeigte
     /// das Fenster etwas an, das den naechsten Start nicht ueberlebt.
-    func apply(_ new: Settings) throws {
+    ///
+    /// Zusammengefuehrt statt uebernommen: das Einstellungsfenster arbeitet auf
+    /// einer Kopie, die es beim Oeffnen gezogen hat, und schreibt bei jedem Klick
+    /// den ganzen Wert zurueck. Menue und Alarmpanel aendern dieselben
+    /// Einstellungen aber weiter, waehrend das Fenster offen steht. Wuerde der
+    /// eingehende Wert unbesehen gelten, machte der naechste Klick im Fenster
+    /// jede zwischenzeitliche Aenderung rueckgaengig.
+    ///
+    /// Die Aufteilung des Besitzes:
+    /// - Grundlage ist `settings`, der lebende Stand im Koordinator.
+    /// - Aus `incoming` kommen nur die Felder, die das Fenster wirklich
+    ///   bedient. Die Stummschaltungen gehoeren dazu: das Fenster entfernt
+    ///   Eintraege ("Wieder alarmieren"), das muss ankommen.
+    /// - `paused` kommt nie aus `incoming`. Der Schalter sitzt allein im Menue,
+    ///   und die gefaehrliche Richtung ist genau diese: ein Speichern aus dem
+    ///   Fenster darf eine Pause niemals aufheben, sonst waeren die Alarme
+    ///   wieder scharf, ohne dass der Nutzer einen Anlass haette nachzusehen.
+    /// - `catchUpGrace` steht in keinem Fenster und bleibt aus demselben Grund
+    ///   beim Koordinator.
+    ///
+    /// Bewusst Feld fuer Feld ausgeschrieben statt `var merged = incoming` mit
+    /// nachtraeglicher Korrektur: so ist an jeder Zeile ablesbar, welche Seite
+    /// das Feld besitzt, und ein spaeter ergaenztes Feld muss hier ausdruecklich
+    /// eingetragen werden, statt stillschweigend aus der veralteten Kopie des
+    /// Fensters zu stammen.
+    func apply(_ incoming: Settings) throws {
+        var merged = settings
+        // Vom Fenster verwaltet:
+        merged.subscribedCalendarIDs = incoming.subscribedCalendarIDs
+        merged.leadTime = incoming.leadTime
+        merged.minimumVolume = incoming.minimumVolume
+        merged.soundPath = incoming.soundPath
+        merged.scanInterval = incoming.scanInterval
+        merged.launchAtLogin = incoming.launchAtLogin
+        merged.mutedEventIDs = incoming.mutedEventIDs
+        merged.mutedSeriesIDs = incoming.mutedSeriesIDs
+        // Nicht vom Fenster verwaltet, bleibt aus `settings`:
+        // merged.paused         — gehoert dem Schalter im Menue
+        // merged.catchUpGrace   — nur ueber die Datei einstellbar
+
         do {
-            try settingsStore.save(new)
+            try settingsStore.save(merged)
         } catch {
             settingsFileBroken = true
             refresh()
             throw error
         }
-        settings = new
+        settings = merged
         settingsFileBroken = false
         refresh()
     }
