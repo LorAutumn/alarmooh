@@ -83,7 +83,11 @@ final class AlarmCoordinator {
     /// Kalenderauswahl — nicht im Alarmpfad.
     func upcomingEvents(limit: Int = upcomingCount) -> [CalendarEvent] {
         let now = Date()
-        let raw = (try? source.events(from: now, to: now.addingTimeInterval(Self.upcomingWindow))) ?? []
+        let raw = (try? source.events(
+            from: now,
+            to: now.addingTimeInterval(Self.upcomingWindow),
+            calendarIDs: settings.subscribedCalendarIDs
+        )) ?? []
         let candidates = EventFilter.selectable(raw, settings: settings)
 
         // Die Regel, wann ein Termin aufhoert aktuell zu sein, steht genau
@@ -146,15 +150,57 @@ final class AlarmCoordinator {
         } else {
             settings = loaded
             settingsFileBroken = false
+            pruneExpiredMutedOccurrences()
         }
         refresh()
+    }
+
+    /// Wirft stummgeschaltete Vorkommen weg, deren Termin laengst vorbei ist.
+    ///
+    /// Ohne das waechst `mutedEventIDs` unbegrenzt: jedes weggeklickte
+    /// Vorkommen legt einen Eintrag an, entfernt wird nie einer. Das kostet
+    /// nicht nur Platz — der Abschnitt "Stummgeschaltet" im Einstellungsfenster
+    /// baut jede Zeile bei jedem Durchlauf neu auf.
+    ///
+    /// Regel und Zeitpunktauswertung stehen in `OccurrenceID`, nicht hier: der
+    /// Aufbau der Kennung gehoert an eine Stelle. Serien werden bewusst nicht
+    /// angefasst, die gelten auf Dauer.
+    ///
+    /// Nur bei defekter Datei laeuft das gar nicht (siehe `scan`) — dort wird
+    /// grundsaetzlich nicht geschrieben. Und geschrieben wird nur, wenn
+    /// tatsaechlich etwas wegfaellt: sonst haette jeder Scan eine Schreiblast
+    /// auf der Platte, alle 30 Minuten und bei jeder Kalenderaenderung.
+    private func pruneExpiredMutedOccurrences() {
+        let kept = OccurrenceID.withoutExpired(settings.mutedEventIDs, now: Date())
+        guard kept != settings.mutedEventIDs else { return }
+
+        let removed = settings.mutedEventIDs.count - kept.count
+        settings.mutedEventIDs = kept
+        do {
+            try settingsStore.save(settings)
+            log.info("\(removed) abgelaufene Stummschaltung(en) entfernt")
+        } catch {
+            // Wie ueberall beim Schreiben: der Stand im Speicher gilt fuer
+            // diese Sitzung, der Nutzer muss aber sehen, dass die Datei klemmt.
+            // Der naechste Scan versucht es erneut.
+            settingsFileBroken = true
+            log.error("Stummschaltungen nicht aufgeraeumt: \(error.localizedDescription)")
+        }
     }
 
     /// Wendet die Einstellungen aus dem Speicher an, ohne die Datei zu lesen.
     private func refresh() {
         let now = Date()
-        let raw = (try? source.events(from: now, to: now.addingTimeInterval(86_400))) ?? []
+        // Die Abfrage ist schon auf die abonnierten Kalender beschraenkt; was
+        // nicht abonniert ist, wird gar nicht erst aus dem Kalender gelesen.
+        let raw = (try? source.events(
+            from: now,
+            to: now.addingTimeInterval(86_400),
+            calendarIDs: settings.subscribedCalendarIDs
+        )) ?? []
         // Erst filtern, dann planen: der Scheduler kennt die Opt-out-Regeln nicht.
+        // `alarmable` prueft das Abo noch einmal — bewusst doppelt: eine Luecke
+        // in der Abfrage oben darf niemals einen fremden Kalender alarmieren.
         events = EventFilter.alarmable(raw, settings: settings)
         forgetHandledEventsNoLongerRelevant()
         // Nicht `events.first`: EventKit liefert auch Termine, die den

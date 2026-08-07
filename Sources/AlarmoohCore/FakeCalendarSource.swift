@@ -12,8 +12,12 @@ public struct FakeCalendarSource: CalendarSource {
 
     public func calendars() throws -> [CalendarInfo] { calendarList }
 
-    public func events(from: Date, to: Date) throws -> [CalendarEvent] {
+    /// Bildet die Einschraenkung der echten Quelle nach: nur Termine aus den
+    /// genannten Kalendern. Eine leere Menge enthaelt keine Kennung, liefert
+    /// also nichts — dieselbe Regel wie in `EventKitCalendarSource`.
+    public func events(from: Date, to: Date, calendarIDs: Set<String>) throws -> [CalendarEvent] {
         events
+            .filter { calendarIDs.contains($0.calendarID) }
             .filter { $0.start >= from && $0.start < to }
             .sorted { $0.start < $1.start }
     }

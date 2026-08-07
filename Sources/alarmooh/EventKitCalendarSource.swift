@@ -20,8 +20,28 @@ final class EventKitCalendarSource: CalendarSource, @unchecked Sendable {
             .sorted { $0.title < $1.title }
     }
 
-    func events(from: Date, to: Date) throws -> [CalendarEvent] {
-        let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
+    /// Fragt EventKit nur nach den abonnierten Kalendern.
+    ///
+    /// WICHTIG, bitte nicht "vereinfachen": `predicateForEvents` versteht
+    /// `calendars: nil` als *alle* Kalender des Speichers. Ein leeres Abo darf
+    /// deshalb niemals zu `nil` werden — das waere aus "nichts alarmiert"
+    /// stillschweigend "alles lesen" geworden. Also lieber frueh aussteigen und
+    /// den Kalender gar nicht erst anfassen.
+    ///
+    /// Dass `EventFilter.selectable` danach noch einmal gegen das Abo prueft,
+    /// bleibt so: die Einschraenkung hier spart Arbeit und liest weniger fremde
+    /// Termine ein, die zweite Pruefung im Speicher ist die Absicherung, falls
+    /// diese hier je danebenliegt.
+    func events(from: Date, to: Date, calendarIDs: Set<String>) throws -> [CalendarEvent] {
+        // Ueber die Kennung aufgeloest, nicht blind uebernommen: ein Abo kann
+        // auf einen geloeschten Kalender zeigen. Der faellt hier einfach weg.
+        let subscribed = store.calendars(for: .event)
+            .filter { calendarIDs.contains($0.calendarIdentifier) }
+        // Leeres Abo — oder keine der gespeicherten Kennungen existiert noch.
+        // Beides heisst: keine Termine.
+        guard !subscribed.isEmpty else { return [] }
+
+        let predicate = store.predicateForEvents(withStart: from, end: to, calendars: subscribed)
         return store.events(matching: predicate)
             .map(Self.convert)
             .sorted { $0.start < $1.start }
@@ -58,17 +78,17 @@ final class EventKitCalendarSource: CalendarSource, @unchecked Sendable {
     /// waere nicht mehr von "ganze Serie stummschalten" zu unterscheiden.
     /// Erst das Paar (eventIdentifier, startDate) ist eindeutig.
     ///
-    /// Der Startzeitpunkt wird als ganze Sekunden seit 1970 geschrieben; damit
-    /// ist die Kennung bei jedem erneuten Scan bitgleich und haengt nicht von
-    /// Locale, Zeitzone oder der Double-Formatierung ab.
+    /// Das Format selbst steht in `OccurrenceID` im Kern — dort, wo es auch
+    /// wieder gelesen wird (Anzeige im Fenster, Aufraeumen alter
+    /// Stummschaltungen). Hier faellt nur die Entscheidung, was der Grundteil
+    /// der Kennung ist.
     private static func occurrenceID(for event: EKEvent) -> String {
-        let start = Int(event.startDate.timeIntervalSince1970)
         // Fehlt die Kennung (bisher nie beobachtet), nehmen wir die lokale
         // Kennung; erst wenn auch die leer ist, bleibt nur eine Zufalls-UUID.
         // Die ist bewusst der letzte Ausweg: sie aendert sich bei jedem Scan.
         let base = event.eventIdentifier
             ?? (event.calendarItemIdentifier.isEmpty ? nil : event.calendarItemIdentifier)
             ?? UUID().uuidString
-        return "\(base)|\(start)"
+        return OccurrenceID.make(eventIdentifier: base, start: event.startDate)
     }
 }

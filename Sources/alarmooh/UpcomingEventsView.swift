@@ -16,21 +16,6 @@ enum EventDisplay {
     }()
 
     static func timestamp(_ date: Date) -> String { formatter.string(from: date) }
-
-    /// Der Startzeitpunkt aus der Kennung eines Vorkommens.
-    ///
-    /// Das Format legt `EventKitCalendarSource.occurrenceID(for:)` fest:
-    /// "<eventIdentifier>|<ganze Sekunden seit 1970>". Bewusst das *letzte*
-    /// "|": der eventIdentifier ist eine fremde Zeichenkette, in der ein
-    /// Trennzeichen vorkommen darf — der Zeitstempel steht immer hinten.
-    /// Nil bedeutet: keine Kennung eines Vorkommens (oder eine aus einer
-    /// aelteren Datei), dann bleibt nur eine ehrliche Ersatzangabe.
-    static func startDate(fromOccurrenceID id: String) -> Date? {
-        guard let separator = id.lastIndex(of: "|") else { return nil }
-        let seconds = id[id.index(after: separator)...]
-        guard !seconds.isEmpty, let value = TimeInterval(seconds) else { return nil }
-        return Date(timeIntervalSince1970: value)
-    }
 }
 
 /// Eine Zeile im Abschnitt "Stummgeschaltet", schon aufgeloest: nie die rohe
@@ -99,7 +84,10 @@ struct MutedEntry: Identifiable {
                     showsRawID: false, sortDate: event.start
                 )
             }
-            if let start = EventDisplay.startDate(fromOccurrenceID: id) {
+            // Derselbe Parser, mit dem der Kern abgelaufene Stummschaltungen
+            // erkennt. Nil heisst hier: kein Zeitpunkt ablesbar, dann bleibt
+            // nur eine ehrliche Ersatzangabe.
+            if let start = OccurrenceID.startDate(from: id) {
                 return MutedEntry(
                     rawID: id, kind: .occurrence,
                     title: "Termin am \(EventDisplay.timestamp(start))",
