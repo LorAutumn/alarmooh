@@ -3,6 +3,13 @@ import AppKit
 import CoreGraphics
 import EventKit
 
+/// Wird ueber Beginn und Ende des Vorhoerens unterrichtet. Klassengebunden,
+/// damit der Koordinator den Beobachter schwach halten kann.
+@MainActor
+protocol PreviewObserver: AnyObject {
+    func previewPlayingChanged(_ isPlaying: Bool)
+}
+
 /// Bindet Kalender, Zeitplanung, Ton und Oberflaeche zusammen.
 ///
 /// Grundsatz: kein Polling. Aus jedem Scan entsteht genau ein Timer auf den
@@ -22,6 +29,13 @@ final class AlarmCoordinator {
     private var scanTimer: Timer?
     private var activeAlarm: CalendarEvent?
 
+    /// Genau ein Beobachter des Vorhoerens, und zwar der zuletzt angemeldete:
+    /// das Einstellungsfenster baut bei jedem Oeffnen ein frisches
+    /// `SettingsModel`, und das verworfene darf dem neuen nicht dazwischenreden.
+    /// Schwach, damit ein verworfenes Modell nicht am Koordinator haengen
+    /// bleibt — es haelt ihn seinerseits stark.
+    private weak var previewObserver: (any PreviewObserver)?
+
     /// Die Datei ist vorhanden, aber unlesbar. Dann wird weder geschrieben noch
     /// nachgeladen — und der Nutzer muss es erfahren, sonst laeuft alarmooh
     /// scheinbar normal weiter, waehrend jede Aenderung ins Leere geht.
@@ -32,6 +46,11 @@ final class AlarmCoordinator {
         self.statusItem = statusItem
         self.settings = settingsStore.load()
         self.settingsFileBroken = settingsStore.lastLoadFailed
+        // Nur weitergereicht: der Player weiss als einziger, wann der Testton
+        // endet, das Fenster als einziges, wie der Knopf dann heisst.
+        player.onPreviewStateChanged = { [weak self] playing in
+            self?.previewObserver?.previewPlayingChanged(playing)
+        }
     }
 
     /// Stand, den das Einstellungsfenster anzeigt.
@@ -167,6 +186,21 @@ final class AlarmCoordinator {
     func previewSound(_ preview: Settings) {
         guard activeAlarm == nil else { return }
         player.preview(settings: preview)
+    }
+
+    /// Bricht das Vorhoeren ab. Die Lautstaerke stellt der Player dabei
+    /// genauso wieder her wie am regulaeren Ende.
+    func stopPreviewSound() {
+        player.stopPreview()
+    }
+
+    /// Meldet den Beobachter des Vorhoerens an und verdraengt damit den
+    /// vorherigen: ein Fenster, das neu aufgeht, ist ab hier allein zustaendig.
+    /// Den aktuellen Stand bekommt es sofort, sonst zeigte ein waehrend des
+    /// Testtons geoeffnetes Fenster "Ton testen" fuer einen laufenden Ton.
+    func observePreview(_ observer: any PreviewObserver) {
+        previewObserver = observer
+        observer.previewPlayingChanged(player.isPreviewing)
     }
 
     /// Verhindert, dass die Menge der erledigten Alarme unbegrenzt waechst:

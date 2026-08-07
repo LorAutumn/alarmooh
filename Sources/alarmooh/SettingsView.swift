@@ -22,6 +22,9 @@ final class SettingsModel {
     /// Fehler von `SMAppService`, getrennt gehalten, weil er in einem anderen
     /// Abschnitt steht und nichts mit der Datei zu tun hat.
     private(set) var loginError: String?
+    /// Laeuft gerade der Testton? Wird nie vom Klick gesetzt, sondern nur
+    /// vom Player gemeldet — nur er weiss, wann der Ton zu Ende ist.
+    private(set) var previewPlaying = false
 
     private let coordinator: AlarmCoordinator
 
@@ -30,6 +33,11 @@ final class SettingsModel {
         self.settings = coordinator.currentSettings
         self.fileBroken = coordinator.settingsFileBroken
         self.calendars = (try? source.calendars()) ?? []
+        // Hier und nicht beim Aufrufer: das Anmelden gehoert untrennbar zum
+        // Entstehen des Modells, und der Koordinator kennt immer nur das
+        // zuletzt angemeldete. Das aeltere ist damit abgemeldet, noch bevor
+        // das Fenster seine neue Ansicht bekommt.
+        coordinator.observePreview(self)
     }
 
     /// Uebernimmt den aktuellen Stand. Scheitert das Schreiben, faellt die
@@ -61,10 +69,15 @@ final class SettingsModel {
 
     // MARK: - Alarmton
 
-    /// Vorhoeren mit dem Stand aus dem Fenster, nicht mit dem gespeicherten:
-    /// der Regler schreibt erst beim Loslassen.
-    func previewSound() {
-        coordinator.previewSound(settings)
+    /// Startet oder beendet das Vorhoeren — derselbe Knopf, je nach Stand.
+    /// Vorgehoert wird mit dem Stand aus dem Fenster, nicht mit dem
+    /// gespeicherten: der Regler schreibt erst beim Loslassen.
+    func togglePreview() {
+        if previewPlaying {
+            coordinator.stopPreviewSound()
+        } else {
+            coordinator.previewSound(settings)
+        }
     }
 
     /// Kopiert die gewaehlte Datei neben die Einstellungen. Wuerde alarmooh nur
@@ -132,6 +145,12 @@ final class SettingsModel {
         }
         loginError = nil
         save()
+    }
+}
+
+extension SettingsModel: PreviewObserver {
+    func previewPlayingChanged(_ isPlaying: Bool) {
+        previewPlaying = isPlaying
     }
 }
 
@@ -222,7 +241,9 @@ struct SettingsView: View {
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
-            Button("Ton testen") { model.previewSound() }
+            Button(model.previewPlaying ? "Test stoppen" : "Ton testen") {
+                model.togglePreview()
+            }
             Text(
                 "Spielt den Alarmton einmal mit der eingestellten Lautstärke. "
                 + "Danach gilt wieder die vorherige Systemlautstärke."
