@@ -61,6 +61,12 @@ final class SettingsModel {
 
     // MARK: - Alarmton
 
+    /// Vorhoeren mit dem Stand aus dem Fenster, nicht mit dem gespeicherten:
+    /// der Regler schreibt erst beim Loslassen.
+    func previewSound() {
+        coordinator.previewSound(settings)
+    }
+
     /// Kopiert die gewaehlte Datei neben die Einstellungen. Wuerde alarmooh nur
     /// den Pfad merken, waere der Alarm stumm, sobald der Nutzer die Datei
     /// verschiebt oder loescht — und das faellt erst im Ernstfall auf.
@@ -213,6 +219,13 @@ struct SettingsView: View {
             Text(
                 "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
                 + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            Button("Ton testen") { model.previewSound() }
+            Text(
+                "Spielt den Alarmton einmal mit der eingestellten Lautstärke. "
+                + "Danach gilt wieder die vorherige Systemlautstärke."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)

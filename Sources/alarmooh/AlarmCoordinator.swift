@@ -118,6 +118,15 @@ final class AlarmCoordinator {
         refresh()
     }
 
+    /// Spielt den Alarmton einmal zum Vorhoeren. Die Einstellungen kommen vom
+    /// Aufrufer und nicht aus `settings`: das Fenster zeigt beim Ziehen des
+    /// Reglers schon einen Wert, der noch nicht geschrieben ist — und genau den
+    /// will der Nutzer hoeren.
+    func previewSound(_ preview: Settings) {
+        guard activeAlarm == nil else { return }
+        player.preview(settings: preview)
+    }
+
     /// Verhindert, dass die Menge der erledigten Alarme unbegrenzt waechst:
     /// Termine ausserhalb des 24-Stunden-Fensters werden vergessen.
     private func forgetHandledEventsNoLongerRelevant() {
