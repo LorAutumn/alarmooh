@@ -27,6 +27,11 @@ final class AlarmCoordinator {
     private var handled: Set<String> = []
     private var alarmTimer: Timer?
     private var scanTimer: Timer?
+    /// Feuert genau dann, wenn der im Menue gezeigte Termin aufhoert, aktuell zu
+    /// sein — sonst stuende er dort bis zum naechsten Sicherheitstakt.
+    private var menuRefreshTimer: Timer?
+    /// Beendet einen laufenden Alarm von selbst; siehe `armAlarmEndTimer`.
+    private var alarmEndTimer: Timer?
     private var activeAlarm: CalendarEvent?
 
     /// Genau ein Beobachter des Vorhoerens, und zwar der zuletzt angemeldete:
@@ -90,15 +95,22 @@ final class AlarmCoordinator {
         // Erst filtern, dann planen: der Scheduler kennt die Opt-out-Regeln nicht.
         events = EventFilter.alarmable(raw, settings: settings)
         forgetHandledEventsNoLongerRelevant()
-        let next = events.first
-        // Auch pausiert bleiben "Naechster: …", Beitreten und Stummschalten im
-        // Menue: wer die Alarme abgestellt hat, will trotzdem an sein Meeting.
+        // Nicht `events.first`: EventKit liefert auch Termine, die den
+        // Suchzeitraum bloss ueberlappen, also laengst laufen. Dieselbe Regel wie
+        // beim Alarm entscheidet, was "naechster Termin" heisst — nur ohne die
+        // Pause. Denn auch pausiert bleiben "Naechster: …", Beitreten und
+        // Stummschalten im Menue: wer die Alarme abgestellt hat, will trotzdem
+        // an sein Meeting.
+        let next = AlarmScheduler.nextRelevantEvent(
+            events: events, now: now, settings: settings, handled: handled
+        )
         statusItem.rebuildMenu(
             nextEvent: next,
             nextEventActions: next.map(menuActions(for:)),
             paused: settings.paused,
             warning: settingsWarning
         )
+        scheduleMenuRefresh(for: next)
         scheduleNextAlarm()
     }
 
@@ -227,6 +239,47 @@ final class AlarmCoordinator {
         alarmTimer?.tolerance = 5
     }
 
+    /// Ein einziger Timer auf den Moment, in dem der gezeigte Termin aufhoert,
+    /// aktuell zu sein. Er ruft nur `refresh`, das dann den naechsten Termin
+    /// bestimmt und sich selbst neu stellt — kein Takt, keine Schleife.
+    ///
+    /// Ohne ihn stuende ein laengst laufender Termin bis zum naechsten
+    /// Sicherheitstakt (Standard: 30 Minuten) im Menue. Genau das ist
+    /// aufgefallen.
+    private func scheduleMenuRefresh(for event: CalendarEvent?) {
+        menuRefreshTimer?.invalidate()
+        menuRefreshTimer = nil
+        guard let event else { return }
+
+        // Eine Sekunde Zuschlag: Die Nachfrist gilt einschliesslich ihrer
+        // Grenze. Genau auf der Grenze waehlte `refresh` denselben Termin
+        // erneut und stellte einen Timer auf null Sekunden — eine Schleife.
+        let expiry = event.start.addingTimeInterval(settings.catchUpGrace + 1)
+        menuRefreshTimer = Timer.scheduledTimer(
+            withTimeInterval: max(expiry.timeIntervalSinceNow, 0), repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        menuRefreshTimer?.tolerance = 5
+    }
+
+    /// Stellt den Alarm nach `AlarmScheduler.alarmEndDate` von selbst ab. Der
+    /// Ton laeuft also nicht mehr endlos, sondern hoechstens bis der Termin
+    /// aufhoert, aktuell zu sein — mindestens aber eine Minute.
+    private func armAlarmEndTimer(for event: CalendarEvent) {
+        alarmEndTimer?.invalidate()
+        let end = AlarmScheduler.alarmEndDate(for: event, now: Date(), settings: settings)
+        alarmEndTimer = Timer.scheduledTimer(
+            withTimeInterval: max(end.timeIntervalSinceNow, 0), repeats: false
+        ) { [weak self] _ in
+            // Derselbe Weg wie ein Klick auf „Stumm": Ton aus, Panel zu, Icon
+            // normal, Vorkommen als erledigt vermerkt. Ohne den Vermerk fiele
+            // der Termin sofort wieder in die Nachholfrist und laeutete erneut.
+            Task { @MainActor in self?.dismissAlarm() }
+        }
+        alarmEndTimer?.tolerance = 1
+    }
+
     private func scheduleScanTimer() {
         scanTimer?.invalidate()
         scanTimer = Timer.scheduledTimer(
@@ -247,6 +300,7 @@ final class AlarmCoordinator {
         activeAlarm = event
         statusItem.setAlarming(true)
         player.start(settings: settings)
+        armAlarmEndTimer(for: event)
 
         let link = LinkExtractor.meetingLink(in: event)
         let view = AlarmView(
@@ -283,6 +337,12 @@ final class AlarmCoordinator {
     /// `dismissAlarm`, weil Pausieren den Alarm zwar abstellt, ihn aber nicht
     /// als erledigt zaehlen darf.
     private func stopActiveAlarm() {
+        // Vor dem Guard und ohne Bedingung: Auf welchem Weg der Alarm auch
+        // endet — Beitreten, Stumm, Wegdruecken, Pausieren, Selbstabschaltung —,
+        // der Endtimer darf nie stehen bleiben und in einen spaeteren Alarm
+        // hineinfeuern.
+        alarmEndTimer?.invalidate()
+        alarmEndTimer = nil
         guard activeAlarm != nil else { return }
         activeAlarm = nil
         player.stop()

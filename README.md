@@ -93,17 +93,25 @@ Weiter im Einstellungsfenster:
 - **Bei Anmeldung starten** — über `SMAppService`. Zuverlässig erst, wenn
   `Alarmooh.app` in `/Applications` liegt, also nach `make install`.
 
-Der Ton läuft in Endlosschleife, bis einer der Knöpfe im Panel gedrückt wird. Es
-gibt bewusst kein Auto-Timeout und kein Snooze. Schläft der Rechner, feuert kein
+Der Ton wiederholt sich, bis einer der Knöpfe im Panel gedrückt wird — und hört sonst
+von selbst auf, sobald der Termin schon zwei Minuten läuft (`catchUpGrace`, dieselbe
+Nachholfrist wie überall). Frühestens allerdings 60 Sekunden, nachdem er begonnen hat:
+Ein nachgeholter Alarm kann losgehen, wenn der Termin bereits 1:58 läuft, und zwei
+Sekunden Ton hätte man genau dann überhört. Ein regulärer Alarm läutet damit vier
+Minuten. Ein Snooze gibt es bewusst nicht. Schläft der Rechner, feuert kein
 Alarm; alarmooh weckt ihn auch nicht.
+
+Nach derselben Frist verschwindet ein Termin auch aus dem Menü: Was länger als zwei
+Minuten läuft, steht nicht mehr unter „Nächster: …" — dort rückt der übernächste nach,
+ohne dass man das Menü dafür aufklappen muss.
 
 ## Eigener Alarmton
 
 Im Repository liegt keine Audiodatei. Beim ersten Alarm erzeugt alarmooh sich selbst
 einen Ersatzton — fünf aufsteigende Töne einer Pentatonik (E5, G5, A5, C6, D6),
 zusammen 2,4 Sekunden — und legt ihn als `fallback-tone-2.wav` neben die Einstellungen.
-Er darf freundlich klingen: Der Ton läuft ohnehin in Endlosschleife, die Dringlichkeit
-liefert also die Wiederholung und nicht die Klangfarbe.
+Er darf freundlich klingen: Der Ton wiederholt sich ohnehin minutenlang, die
+Dringlichkeit liefert also die Wiederholung und nicht die Klangfarbe.
 
 Ein eigener Ton wird im Einstellungsfenster unter „Alarmton" ausgewählt. Die Datei
 wird dabei nach `~/Library/Application Support/alarmooh/` kopiert, nicht bloß
@@ -154,10 +162,10 @@ AVFoundation und CoreAudio.
 make test
 ```
 
-Aktueller Stand: **49 Tests, alle grün**. Abgedeckt sind Filterregeln,
-Link-Extraktion, Zeitplanung samt Nachholfrist, das Laden und Speichern der
-Einstellungen und der erzeugte Ersatzton. Panel, Menüleiste und die CoreAudio-Anbindung
-sind nicht getestet und werden von Hand geprüft.
+Aktueller Stand: **60 Tests, alle grün**. Abgedeckt sind Filterregeln,
+Link-Extraktion, Zeitplanung samt Nachholfrist und Selbstabschaltung des Tons, das
+Laden und Speichern der Einstellungen und der erzeugte Ersatzton. Panel, Menüleiste
+und die CoreAudio-Anbindung sind nicht getestet und werden von Hand geprüft.
 
 ## Bekannte Grenzen
 

@@ -110,3 +110,74 @@ private func settings(leadTime: TimeInterval = 120, grace: TimeInterval = 120) -
 
     #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: paused) == nil)
 }
+
+// MARK: - Naechster aktueller Termin (Menue)
+
+@Test func relevantEventDropsEventRunningLongerThanGrace() {
+    // EventKit liefert laufende Termine mit; ohne diese Regel stuende ein seit
+    // einer Viertelstunde laufendes Meeting weiter als "Naechster" im Menue.
+    let running = CalendarEvent.stub(id: "laeuft", start: now.addingTimeInterval(-900))
+    let upcoming = CalendarEvent.stub(id: "kommt", start: now.addingTimeInterval(1800))
+
+    let next = AlarmScheduler.nextRelevantEvent(
+        events: [running, upcoming], now: now, settings: settings()
+    )
+
+    #expect(next?.id == "kommt")
+}
+
+@Test func relevantEventKeepsEventStartedWithinGrace() {
+    let event = CalendarEvent.stub(id: "gerade-erst", start: now.addingTimeInterval(-60))
+    let next = AlarmScheduler.nextRelevantEvent(events: [event], now: now, settings: settings())
+    #expect(next?.id == "gerade-erst")
+}
+
+@Test func relevantEventSkipsHandledEvent() {
+    let done = CalendarEvent.stub(id: "erledigt", start: now.addingTimeInterval(300))
+    let next = CalendarEvent.stub(id: "danach", start: now.addingTimeInterval(900))
+
+    let result = AlarmScheduler.nextRelevantEvent(
+        events: [done, next], now: now, settings: settings(), handled: ["erledigt"]
+    )
+
+    #expect(result?.id == "danach")
+}
+
+@Test func relevantEventSurvivesPauseAlthoughAlarmDoesNot() {
+    // Pausiert heisst: kein Ton. Das Menue zeigt den Termin trotzdem, sonst
+    // koennte man aus der Pause heraus nicht mehr beitreten.
+    let event = CalendarEvent.stub(id: "trotzdem-sichtbar", start: now.addingTimeInterval(600))
+    var paused = settings()
+    paused.paused = true
+
+    #expect(
+        AlarmScheduler.nextRelevantEvent(events: [event], now: now, settings: paused)?.id
+            == "trotzdem-sichtbar"
+    )
+    #expect(AlarmScheduler.nextAlarm(events: [event], now: now, settings: paused) == nil)
+}
+
+// MARK: - Ende des laufenden Alarms
+
+@Test func alarmEndsGraceAfterEventStart() {
+    // Regulaerer Alarm: zwei Minuten vor Beginn ausgeloest, endet zwei Minuten
+    // nach Beginn — also vier Minuten Laeuten.
+    let event = CalendarEvent.stub(start: now.addingTimeInterval(120))
+    let end = AlarmScheduler.alarmEndDate(for: event, now: now, settings: settings(grace: 120))
+    #expect(end == now.addingTimeInterval(240))
+}
+
+@Test func alarmFiringAtEventStartStillEndsAtStartPlusGrace() {
+    // Start + Nachfrist liegt hier 120 s entfernt, also mehr als die Untergrenze.
+    let event = CalendarEvent.stub(start: now)
+    let end = AlarmScheduler.alarmEndDate(for: event, now: now, settings: settings(grace: 120))
+    #expect(end == now.addingTimeInterval(120))
+}
+
+@Test func catchUpAlarmRingsAtLeastOneMinute() {
+    // Nachgeholter Alarm: der Termin laeuft schon 118 s, die strenge Regel gaebe
+    // zwei Sekunden Ton. Stattdessen eine Minute ab jetzt.
+    let event = CalendarEvent.stub(start: now.addingTimeInterval(-118))
+    let end = AlarmScheduler.alarmEndDate(for: event, now: now, settings: settings(grace: 120))
+    #expect(end == now.addingTimeInterval(60))
+}

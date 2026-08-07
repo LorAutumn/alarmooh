@@ -7,8 +7,9 @@
 
 alarmooh ist eine eigenständige macOS-App in der Menüleiste. Sie liest den lokalen
 Kalender, erkennt die nächsten wichtigen Termine und schlägt zwei Minuten vor Beginn
-mit einem dauerhaft schleifenden Signalton Alarm. Der Ton läuft, bis der Nutzer ihn
-abstellt — entweder durch Klick auf den Meeting-Link oder durch Stummschalten.
+mit einem schleifenden Signalton Alarm. Der Ton läuft, bis der Nutzer ihn abstellt —
+entweder durch Klick auf den Meeting-Link oder durch Stummschalten —, längstens
+jedoch bis der Termin aufhört, aktuell zu sein.
 
 Kein Backend, kein Netzwerkzugriff, keine Konten. Ein einzelner lokaler Prozess.
 
@@ -41,14 +42,15 @@ Zwei Targets, damit die Logik ohne UI testbar bleibt.
   Implementierungen: `EventKitCalendarSource` produktiv, `FakeCalendarSource` im Test.
 - **`EventFilter`** — wendet die Opt-out-Regeln an.
 - **`LinkExtractor`** — findet Meeting-URLs in Termindaten.
-- **`AlarmScheduler`** — bestimmt den nächsten fälligen Alarm.
+- **`AlarmScheduler`** — bestimmt den nächsten fälligen Alarm, den nächsten noch
+  aktuellen Termin und das Ende eines laufenden Alarms.
 - **`Settings`** — abonnierte Kalender, Mute-Liste, Vorlaufzeit, Mindestlautstärke, Sound-Pfad.
 
 ### alarmooh (Executable, AppKit mit SwiftUI-Views)
 
 - **`StatusItemController`** — Menüleisten-Icon und Menü.
 - **`AlarmPanelController`** — das schwebende Alarm-Fenster.
-- **`AlarmPlayer`** — Endlosschleife des Alarmtons.
+- **`AlarmPlayer`** — schleifende Wiedergabe des Alarmtons, bis er abgestellt wird.
 - **`SystemVolumeController`** — CoreAudio, hebt und stellt die Ausgabelautstärke zurück.
 
 AppKit-Lifecycle statt SwiftUI `MenuBarExtra`: In einem selbst zusammengebauten
@@ -141,6 +143,28 @@ Das ist keine Panne, sondern dieselbe Regel, die verhindert, dass ein zehn Minut
 alter Termin nach dem Aufklappen des Deckels noch losschreit. Wer ein längeres Fenster
 möchte, stellt `catchUpGrace` hoch.
 
+### Wann ein Termin aufhört, aktuell zu sein
+
+`catchUpGrace` nach seinem Beginn — und das gilt an allen drei Stellen, an denen die
+Frage auftaucht:
+
+- Es wird kein Alarm mehr für ihn geplant (`nextAlarm`).
+- Er verschwindet aus dem Menü: `nextRelevantEvent` liefert dann den übernächsten.
+  Das ist nötig, weil EventKit auf ein Zeitfenster alles zurückgibt, was es
+  überlappt — eine seit einer Viertelstunde laufende Besprechung steht sonst als
+  frühester Termin weiter unter „Nächster: …".
+- Ein laufender Alarm stellt sich selbst ab (`alarmEndDate`).
+
+Beide Menü-Funktionen sind dieselbe Regel wie beim Alarm, nur ohne die Pause: Wer die
+Alarme abgestellt hat, will trotzdem sehen, was ansteht, und beitreten können.
+`nextAlarm` ist deshalb über `nextRelevantEvent` definiert — es gibt genau eine
+Definition von „nächster Termin", Menü und Alarm können nicht auseinanderlaufen.
+
+Damit das Menü nicht bis zum nächsten Sicherheitstakt veraltet dasteht, setzt der
+Koordinator einen einzigen Timer auf genau diesen Ablaufzeitpunkt, der nichts weiter
+tut als das Menü neu aufzubauen. Kein Takt, keine Schleife: Der Timer wird bei jedem
+Neuaufbau verworfen und neu gestellt.
+
 ### Nur bei aktivem Rechner
 
 Schläft der Rechner oder ist der Deckel geschlossen, feuert kein Alarm; alarmooh
@@ -182,6 +206,9 @@ Ein Template-Symbol (Glocke), das im Alarmzustand die Farbe wechselt. Das Menü 
 den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst „Kein
 überwachter Termin") sowie „Einstellungen…" und „alarmooh beenden".
 Kein Dock-Icon und kein App-Switcher-Eintrag — geregelt über `LSUIElement`.
+
+Gezeigt wird nur ein Termin, der noch aktuell ist: Läuft er länger als `catchUpGrace`,
+rückt der übernächste nach — von selbst, ohne dass man das Menü aufklappen muss.
 
 Zum nächsten Termin kommen zwei Aktionen dazu:
 
@@ -228,8 +255,24 @@ technisch nicht möglich:
 
 ### Ton und Lautstärke
 
-`AVAudioPlayer` mit `numberOfLoops = -1`: endlos, bis der Nutzer stoppt. Kein
-Auto-Timeout.
+`AVAudioPlayer` mit `numberOfLoops = -1`: Der Ton wiederholt sich, bis er abgestellt
+wird. Ein Snooze gibt es nicht.
+
+Abgestellt wird er auf zwei Wegen. Normalerweise vom Nutzer — Beitreten, Stumm,
+Wegdrücken, Pausieren. Tut er nichts, hört der Ton von selbst auf, sobald der Termin
+aufhört, aktuell zu sein, also `catchUpGrace` nach seinem Beginn. Beim Standard-Vorlauf
+und der Standard-Nachfrist läutet ein regulärer Alarm damit vier Minuten.
+
+Eine Untergrenze gibt es trotzdem: frühestens 60 Sekunden, nachdem der Ton begonnen
+hat. Ein nachgeholter Alarm kann losgehen, wenn der Termin schon 1:58 läuft; die
+strenge Regel ließe ihn dann zwei Sekunden läuten — ein Piepser, den der Nutzer genau
+in dem Fall verpasst, für den die Nachholfrist überhaupt da ist.
+
+Die Selbstabschaltung nimmt denselben Weg wie ein Klick auf „Stumm": Ton aus, Panel
+zu, Icon wieder normal, und das Vorkommen wird als erledigt vermerkt — ohne den
+Vermerk fiele der Termin sofort wieder in die Nachholfrist und läutete erneut. Endet
+der Alarm auf einem anderen Weg, wird der Timer verworfen; er darf nie in einen
+späteren Alarm hineinfeuern.
 
 Parallel setzt `SystemVolumeController` per CoreAudio die Ausgabelautstärke auf den
 eingestellten Mindestwert und hebt eine Stummschaltung auf. Der vorherige Zustand
@@ -249,8 +292,8 @@ D6 —, die sich überlappen und zusammen 2,4 Sekunden ergeben. Jede Note ist ei
 plus ein leiser zweiter Oberton, beide exponentiell abklingend; alle Noten werden
 summiert und die Summe auf Spitze 0,85 normalisiert, gemessener RMS 0,17.
 
-Die Dringlichkeit liefert die Wiederholung, nicht die Klangfarbe: Der Ton läuft in
-Endlosschleife, bis der Nutzer ihn abstellt, und darf deshalb freundlich klingen. Die
+Die Dringlichkeit liefert die Wiederholung, nicht die Klangfarbe: Der Ton wiederholt
+sich minutenlang, bis er abgestellt wird, und darf deshalb freundlich klingen. Die
 frühere Fassung hielt zwei Töne fast durchgängig auf voller Amplitude und tauschte
 damit ein Glöckchen gegen eine Sirene — der falsche Tausch.
 
@@ -350,7 +393,11 @@ Anbieter schlägt Abmeldelink; HTML-Entities; bloße Domain im Fließtext ist ke
 
 **Scheduler** — nächster Termin korrekt gewählt; dicht aufeinanderfolgende Termine;
 verpasster Alarm wird nach dem Aufwachen nur innerhalb der Nachholfrist ausgelöst;
-vergangene Termine lösen nicht aus.
+vergangene Termine lösen nicht aus. Dazu der nächste noch aktuelle Termin fürs Menü —
+ein länger laufender fällt heraus, ein gerade begonnener bleibt, ein erledigter wird
+übersprungen, und pausiert bleibt er sichtbar, obwohl kein Alarm mehr geplant wird.
+Und das Ende eines laufenden Alarms: regulär Beginn plus Nachfrist, beim nachgeholten
+Alarm mindestens eine Minute ab jetzt.
 
 **Einstellungen** — leeres und unvollständiges JSON ergeben Standardwerte, unbekannte
 Schlüssel stören nicht, unsinnige Werte werden geklemmt, eine defekte Datei wird
@@ -366,8 +413,10 @@ Absturz überleben muss, ist dagegen getestet.
 
 ## Bewusst weggelassen
 
-Snooze, Auto-Timeout des Tons, mehrere Sounds pro Kalender, Kalender-Schreibzugriff,
-Countdown in der Menüleiste, Google-Calendar-API als zweite Quelle.
+Snooze, ein eigener einstellbarer Auto-Timeout des Tons (das Ende hängt an
+`catchUpGrace` und braucht keinen zweiten Wert), eine Meldung beim Selbstabschalten,
+mehrere Sounds pro Kalender, Kalender-Schreibzugriff, Countdown in der Menüleiste,
+Google-Calendar-API als zweite Quelle.
 
 ## Bekannte Grenzen
 
