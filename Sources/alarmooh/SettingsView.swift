@@ -16,6 +16,9 @@ final class SettingsModel {
     // Voll qualifiziert: SwiftUI hat eine eigene Szene namens `Settings`.
     var settings: AlarmoohCore.Settings
     private(set) var calendars: [CalendarInfo] = []
+    /// Die naechsten Termine zur Auswahl. Kommen vom Koordinator, weil nur er
+    /// die Kalenderquelle und die Filterregeln kennt.
+    private(set) var upcoming: [CalendarEvent] = []
     private(set) var fileBroken: Bool
     /// Fehler des letzten Schreibversuchs; nil, wenn alles sitzt.
     private(set) var saveError: String?
@@ -33,6 +36,7 @@ final class SettingsModel {
         self.settings = coordinator.currentSettings
         self.fileBroken = coordinator.settingsFileBroken
         self.calendars = (try? source.calendars()) ?? []
+        self.upcoming = coordinator.upcomingEvents()
         // Hier und nicht beim Aufrufer: das Anmelden gehoert untrennbar zum
         // Entstehen des Modells, und der Koordinator kennt immer nur das
         // zuletzt angemeldete. Das aeltere ist damit abgemeldet, noch bevor
@@ -65,6 +69,44 @@ final class SettingsModel {
             settings.subscribedCalendarIDs.remove(id)
         }
         save()
+        // Nur hier neu abfragen: die Kalenderauswahl ist das einzige, was die
+        // Liste der naechsten Termine inhaltlich aendert. Stummschaltungen
+        // aendern nur den Zustand der Schalter, nicht die Auswahl.
+        reloadUpcoming()
+    }
+
+    // MARK: - Naechste Termine
+
+    func reloadUpcoming() {
+        upcoming = coordinator.upcomingEvents()
+    }
+
+    func isEventMuted(_ id: String) -> Bool { settings.mutedEventIDs.contains(id) }
+
+    func isSeriesMuted(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return settings.mutedSeriesIDs.contains(id)
+    }
+
+    /// Stummschalten laeuft ueber den Koordinator und nicht ueber `save()`:
+    /// das ist derselbe Weg wie aus Menue und Alarmpanel, samt Abstellen eines
+    /// gerade laufenden Alarms. Danach den eigenen Stand nachziehen — sonst
+    /// schriebe der naechste `save()` aus diesem Fenster die veraltete Kopie
+    /// zurueck und haette die Stummschaltung wieder aufgehoben.
+    func setEventMuted(_ id: String, _ muted: Bool) {
+        coordinator.setEventMuted(id, muted)
+        adoptCoordinatorState()
+    }
+
+    func setSeriesMuted(_ id: String, _ muted: Bool) {
+        coordinator.setSeriesMuted(id, muted)
+        adoptCoordinatorState()
+    }
+
+    private func adoptCoordinatorState() {
+        settings = coordinator.currentSettings
+        fileBroken = coordinator.settingsFileBroken
+        saveError = nil
     }
 
     // MARK: - Alarmton
@@ -116,14 +158,16 @@ final class SettingsModel {
 
     // MARK: - Stummschaltungen
 
-    func unmuteEvent(_ id: String) {
-        settings.mutedEventIDs.remove(id)
-        save()
+    /// Aufgeloeste Eintraege des Abschnitts "Stummgeschaltet".
+    var mutedEntries: [MutedEntry] {
+        MutedEntry.entries(settings: settings, upcoming: upcoming)
     }
 
-    func unmuteSeries(_ id: String) {
-        settings.mutedSeriesIDs.remove(id)
-        save()
+    func unmute(_ entry: MutedEntry) {
+        switch entry.kind {
+        case .occurrence: setEventMuted(entry.rawID, false)
+        case .series: setSeriesMuted(entry.rawID, false)
+        }
     }
 
     // MARK: - Anmeldeobjekt
@@ -163,6 +207,7 @@ struct SettingsView: View {
         Form {
             if model.fileBroken { brokenFileSection }
             calendarSection
+            upcomingSection
             leadTimeSection
             volumeSection
             soundSection
@@ -212,6 +257,32 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             if let saveError = model.saveError {
                 Text(saveError).font(.footnote).foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var upcomingSection: some View {
+        Section("Nächste Termine") {
+            if model.settings.subscribedCalendarIDs.isEmpty {
+                Text("Kein Kalender abonniert — hake oben einen Kalender an, "
+                     + "dann stehen hier die nächsten Termine.")
+                    .foregroundStyle(.secondary)
+            } else if model.upcoming.isEmpty {
+                Text("In den nächsten 60 Tagen steht nichts an.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.upcoming) { event in
+                    UpcomingEventRow(
+                        event: event,
+                        isEventMuted: model.isEventMuted(event.id),
+                        isSeriesMuted: model.isSeriesMuted(event.seriesID),
+                        setEventMuted: { model.setEventMuted(event.id, $0) },
+                        setSeriesMuted: { muted in
+                            guard let seriesID = event.seriesID else { return }
+                            model.setSeriesMuted(seriesID, muted)
+                        }
+                    )
+                }
             }
         }
     }
@@ -275,29 +346,14 @@ struct SettingsView: View {
 
     private var mutedSection: some View {
         Section("Stummgeschaltet") {
-            if model.settings.mutedEventIDs.isEmpty && model.settings.mutedSeriesIDs.isEmpty {
+            let entries = model.mutedEntries
+            if entries.isEmpty {
                 Text("Nichts stummgeschaltet").foregroundStyle(.secondary)
             } else {
-                ForEach(model.settings.mutedSeriesIDs.sorted(), id: \.self) { id in
-                    mutedRow(label: "Serie", id: id) { model.unmuteSeries(id) }
-                }
-                ForEach(model.settings.mutedEventIDs.sorted(), id: \.self) { id in
-                    mutedRow(label: "Termin", id: id) { model.unmuteEvent(id) }
+                ForEach(entries) { entry in
+                    MutedEntryRow(entry: entry) { model.unmute(entry) }
                 }
             }
-        }
-    }
-
-    private func mutedRow(label: String, id: String, remove: @escaping () -> Void) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label).font(.caption).foregroundStyle(.secondary)
-                Text(id).font(.system(.caption, design: .monospaced))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-            Button("Wieder alarmieren", action: remove)
         }
     }
 

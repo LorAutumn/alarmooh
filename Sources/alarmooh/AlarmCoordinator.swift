@@ -61,6 +61,68 @@ final class AlarmCoordinator {
     /// Stand, den das Einstellungsfenster anzeigt.
     var currentSettings: Settings { settings }
 
+    // MARK: - Vorschau fuer das Einstellungsfenster
+
+    /// Zeitraum, in dem das Einstellungsfenster nach den naechsten Terminen
+    /// sucht. Bewusst viel weiter als das 24-Stunden-Fenster des Alarm-Scans:
+    /// gefragt sind zehn Termine, und wer alle zwei Wochen einen Serientermin
+    /// hat, findet den zehnten erst nach Monaten. 60 Tage decken auch einen
+    /// leeren Kalender mit einem einzigen zweiwoechentlichen Termin ab (vier
+    /// Vorkommen) und bleiben eine einzige, kurze EventKit-Abfrage.
+    static let upcomingWindow: TimeInterval = 60 * 86_400
+    /// So viele Termine zeigt das Einstellungsfenster.
+    static let upcomingCount = 10
+
+    /// Die naechsten Termine fuer die Auswahl im Einstellungsfenster.
+    ///
+    /// Gefiltert mit `selectable`, nicht mit `alarmable`: stummgeschaltete
+    /// Termine muessen hier stehen bleiben, sonst kaeme man an den Schalter
+    /// zum Wiedereinschalten gar nicht heran.
+    ///
+    /// Laeuft synchron beim Oeffnen des Fensters und beim Aendern der
+    /// Kalenderauswahl — nicht im Alarmpfad.
+    func upcomingEvents(limit: Int = upcomingCount) -> [CalendarEvent] {
+        let now = Date()
+        let raw = (try? source.events(from: now, to: now.addingTimeInterval(Self.upcomingWindow))) ?? []
+        let candidates = EventFilter.selectable(raw, settings: settings)
+
+        // Die Regel, wann ein Termin aufhoert aktuell zu sein, steht genau
+        // einmal — in `AlarmScheduler`. Sie haengt allein am Startzeitpunkt und
+        // die Liste ist nach Start sortiert; ab dem ersten noch aktuellen
+        // Termin ist deshalb auch alles Folgende aktuell. Ein zweites
+        // Nachbauen des Nachfrist-Vergleichs waere die Stelle, an der Menue und
+        // Fenster spaeter auseinanderlaufen.
+        guard
+            let first = AlarmScheduler.nextRelevantEvent(
+                events: candidates, now: now, settings: settings
+            ),
+            let start = candidates.firstIndex(where: { $0.id == first.id })
+        else { return [] }
+
+        return Array(candidates[start...].prefix(limit))
+    }
+
+    /// Schaltet ein einzelnes Vorkommen aus dem Einstellungsfenster stumm oder
+    /// wieder scharf — ueber denselben Weg wie Menue und Alarmpanel.
+    func setEventMuted(_ eventID: String, _ muted: Bool) {
+        if muted {
+            muteEvent(eventID)
+        } else {
+            settings.mutedEventIDs.remove(eventID)
+            persistLocalChange()
+        }
+    }
+
+    /// Dasselbe fuer eine ganze Serie: gilt fuer alle kuenftigen Vorkommen.
+    func setSeriesMuted(_ seriesID: String, _ muted: Bool) {
+        if muted {
+            muteSeries(seriesID)
+        } else {
+            settings.mutedSeriesIDs.remove(seriesID)
+            persistLocalChange()
+        }
+    }
+
     func start() {
         // Muss vor jedem moeglichen Alarm laufen: laeuft es mitten im Alarm,
         // loescht es den lebenden Snapshot und die Lautstaerke bleibt oben.
