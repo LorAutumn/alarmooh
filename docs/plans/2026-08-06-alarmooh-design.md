@@ -38,12 +38,18 @@ Zwei Targets, damit die Logik ohne UI testbar bleibt.
 
 ### AlarmoohCore (Library, UI-frei)
 
-- **`CalendarSource`** — Protokoll: liefert Termine im Fenster *jetzt bis +24 h*.
-  Implementierungen: `EventKitCalendarSource` produktiv, `FakeCalendarSource` im Test.
+- **`CalendarSource`** — Protokoll: liefert Termine im Fenster *jetzt bis +24 h*, und
+  zwar nur aus den übergebenen Kalendern (`events(from:to:calendarIDs:)`). Der Umfang
+  ist ein Parameter und kein Zustand der Quelle, nicht optional und ohne Vorgabewert:
+  Es gibt keinen Wert mehr, der „alle Kalender" bedeutet. Implementierungen:
+  `EventKitCalendarSource` produktiv, `FakeCalendarSource` im Test.
 - **`EventFilter`** — wendet die Opt-out-Regeln an.
-- **`LinkExtractor`** — findet Meeting-URLs in Termindaten.
+- **`LinkExtractor`** — findet Meeting-URLs in Termindaten. `isKnownProvider` ist
+  öffentlich, damit das Alarm-Panel vor einem unbekannten Host warnen kann; die Liste
+  `knownHosts` bleibt intern.
 - **`AlarmScheduler`** — bestimmt den nächsten fälligen Alarm, den nächsten noch
   aktuellen Termin und das Ende eines laufenden Alarms.
+- **`OccurrenceID`** — Aufbau, Zerlegung und Verfallsregel der Vorkommens-Kennung.
 - **`Settings`** — abonnierte Kalender, Mute-Liste, Vorlaufzeit, Mindestlautstärke, Sound-Pfad.
 
 ### alarmooh (Executable, AppKit mit SwiftUI-Views)
@@ -61,7 +67,7 @@ eigenem Window-Level wird ohnehin gebraucht. Die Fensterinhalte sind SwiftUI.
 
 ```
 EventKit
-   │  Scan-Fenster: jetzt … +24 h
+   │  Scan-Fenster: jetzt … +24 h, nur abonnierte Kalender
    ▼
 EventFilter ──► sortierte Terminliste
    │
@@ -83,14 +89,24 @@ Beim ersten Start einmalig `requestFullAccessToEvents`. Wird die Berechtigung
 verweigert, zeigt das Menü einen Hinweis mit Direktlink in die Systemeinstellungen,
 statt stillschweigend nichts zu tun.
 
+Der Text im Systemdialog (`NSCalendarsFullAccessUsageDescription`) benennt den Umfang
+statt nur den Zweck: gelesen werden ausschließlich die Termine der ausgewählten
+Kalender, geändert wird dort nichts, den Vollzugriff verlangt macOS mangels reinem
+Lesezugriff, und dauerhaft gespeichert wird davon nur, welche Termine stummgeschaltet
+sind. Wer der Frage zustimmen soll, muss wissen, worauf.
+
 ### Scan-Auslöser
 
-Ausgelesen wird immer nur das Fenster *jetzt bis +24 h*, nie der ganze Kalender.
-Drei Auslöser:
+Ausgelesen wird immer nur das Fenster *jetzt bis +24 h*, nie der ganze Kalender — und
+darin nur die abonnierten Kalender. Ist das Abo leer oder existiert keiner der
+gespeicherten Kalender mehr, wird EventKit gar nicht erst gefragt; `predicateForEvents`
+versteht `calendars: nil` als *alle* Kalender, aus „nichts alarmiert" dürfte also
+niemals „alles lesen" werden. Drei Auslöser:
 
 1. `EKEventStoreChanged` — das System meldet Änderungen von sich aus, kein Polling nötig.
 2. Ein Sicherheitstakt alle 30 Minuten (einstellbar).
-3. Aufwachen aus dem Ruhezustand.
+3. Aufwachen aus dem Ruhezustand — beobachtet über `didWake` und `screensDidWake`,
+   was in der Praxis zwei Scans ergibt (siehe „Bekannte Grenzen").
 
 Der Scan-Takt hat nichts mit der Alarmgenauigkeit zu tun. Aus dem Scan entsteht
 genau ein Timer auf den exakten Auslösezeitpunkt. Zwischen zwei Alarmen ist der
@@ -98,7 +114,9 @@ Prozess untätig.
 
 ### Filterregeln (Opt-out)
 
-1. Nur Termine aus abonnierten Kalendern.
+1. Nur Termine aus abonnierten Kalendern. Das steht schon in der Abfrage; die Prüfung
+   im Speicher bleibt bewusst als zweite Verteidigungslinie stehen — eine Lücke in der
+   Abfrage darf niemals einen fremden Kalender alarmieren.
 2. Stummgeschaltetes entfällt: einzelnes Vorkommen über seine Vorkommens-Kennung,
    ganze Serie über `calendarItemExternalIdentifier`, womit alle künftigen Vorkommen
    still sind.
@@ -122,6 +140,13 @@ bitgleich und unabhängig von Locale, Zeitzone und Fließkomma-Formatierung. Ohn
 Startzeitpunkt würde ein einmal weggeklickter Alarm die komplette Serie stummschalten,
 und „dieses eine Vorkommen" wäre nicht mehr von „die ganze Serie" zu unterscheiden.
 Bitte nicht vereinfachen.
+
+Format, Zerlegung und Verfallsregel stehen an einer einzigen Stelle, in `OccurrenceID`
+im Kern. Gelesen wird die Kennung an mehreren: Das Einstellungsfenster zeigt den
+Zeitpunkt an, und das Aufräumen abgelaufener Stummschaltungen braucht ihn ebenfalls.
+Zwei Parser nebeneinander wären die Stelle, an der beide Seiten später auseinander
+laufen. Zerlegt wird am *letzten* Trennzeichen, weil der `eventIdentifier` eine fremde
+Zeichenkette ist, in der ein „|" vorkommen darf.
 
 Apple dokumentiert `eventIdentifier` ausdrücklich als über eine Synchronisation hinweg
 veränderlich. Wird ein Termin anderswo bearbeitet, kann eine Stummschaltung oder ein
@@ -204,7 +229,9 @@ nicht zusammengesetzt.
 
 Ein Template-Symbol (Glocke), das im Alarmzustand die Farbe wechselt. Das Menü zeigt
 den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst „Kein
-überwachter Termin") sowie „Einstellungen…" und „alarmooh beenden".
+überwachter Termin"), den Schalter „Alarme pausieren" / „Alarme fortsetzen" — bei
+laufender Pause dazu ganz oben die graue Zeile „Alarme sind ausgeschaltet" — sowie
+„Einstellungen…" und „alarmooh beenden".
 Kein Dock-Icon und kein App-Switcher-Eintrag — geregelt über `LSUIElement`.
 
 Gezeigt wird nur ein Termin, der noch aktuell ist: Läuft er länger als `catchUpGrace`,
@@ -233,6 +260,18 @@ Inhalt: Terminname groß, darunter Startzeit und Kalendername, dann die Aktionen
 
 - **Beitreten** — nur bei gefundenem Link. Öffnet die URL und stoppt den Ton in einem Klick.
 - **Stumm** — beendet den Alarm. Immer vorhanden.
+- **`Ziel: <Host>`** — unter den beiden Knöpfen, sobald ein Link vorhanden ist. Titel,
+  Notizen und URL stammen aus einer Einladung, die jeder schicken kann; unter laufendem
+  Alarmton wird „Beitreten" im Reflex geklickt, also muss vorher sichtbar sein, wohin er
+  führt. Gezeigt wird nur der Host — die volle URL wäre für 320 pt zu lang und schöbe
+  genau den beurteilbaren Teil aus dem Blick; sie steht als Tooltip dahinter. Gekürzt
+  wird vorne, weil die aussagekräftigen Labels eines Hosts hinten stehen.
+- **„Unbekannter Anbieter — prüfe die Adresse."** — eine zusätzliche orange Zeile, wenn
+  der Host zu keinem bekannten Meeting-Anbieter gehört (`LinkExtractor.isKnownProvider`).
+  Ein unbekannter Host ist kein Beweis für einen Angriff: Ein firmeninternes Meeting
+  liegt zu Recht auf einer eigenen Domain. Deshalb nur ein Hinweis, der Knopf wird nie
+  gesperrt. Die Warnung steht im Text und nicht in der Farbe allein, sonst trüge sie für
+  Farbfehlsichtige nichts.
 - **Diesen Termin nicht alarmieren** — schreibt die Vorkommens-Kennung in `mutedEventIDs`.
   Immer vorhanden, auch bei einmaligen Terminen. Betrifft nur dieses eine Vorkommen.
 - **Diese Serie nie wieder** — schreibt die Serien-ID in `mutedSeriesIDs`. Nur, wenn der
@@ -275,11 +314,43 @@ der Alarm auf einem anderen Weg, wird der Timer verworfen; er darf nie in einen
 späteren Alarm hineinfeuern.
 
 Parallel setzt `SystemVolumeController` per CoreAudio die Ausgabelautstärke auf den
-eingestellten Mindestwert und hebt eine Stummschaltung auf. Der vorherige Zustand
-wird gemerkt und beim Stoppen sowie beim Beenden der App zurückgeschrieben.
-Zusätzlich wird er auf Platte geschrieben, damit ein Absturz während des Alarms die
-Lautstärke nicht dauerhaft oben stehen lässt — beim nächsten Start wird sie
-wiederhergestellt.
+eingestellten Mindestwert und hebt eine Stummschaltung auf. Der vorherige Zustand wird
+gemerkt und beim Stoppen zurückgeschrieben; zusätzlich liegt er in
+`volume-snapshot.json`, damit ein Absturz während des Alarms die Lautstärke nicht
+dauerhaft oben stehen lässt.
+
+Das Anheben ist nur unter der Zusage vertretbar, dass es zurückgenommen wird. Drei
+Stellen sichern das ab:
+
+- `applicationWillTerminate` stellt erst das Vorhören ab, dann den Alarm — denselben
+  Weg wie ein Klick auf „Stumm" —, und schreibt zuletzt einen noch liegenden
+  Schnappschuss zurück. „alarmooh beenden" steht im Menü und ist die naheliegendste
+  Reaktion auf einen Alarm, den man loswerden will; vorher endete der Prozess, ohne
+  dass je ein `restore()` lief.
+- Die Wiederherstellung nach einem Absturz läuft beim Start bedingungslos und **vor**
+  der Abfrage der Kalenderberechtigung. Sie hing vorher im Erfolgszweig hinter
+  `requestAccess()`: Wurde der Zugriff verweigert oder entzogen, blieb die Lautstärke
+  dauerhaft oben. Mit dem Kalender hat das Zurücksetzen nichts zu tun — es liest eine
+  Datei und schreibt höchstens eine Lautstärke.
+- Der Schnappschuss merkt sich das Ausgabegerät als `kAudioDevicePropertyDeviceUID`,
+  nicht als `AudioObjectID`: Die numerischen IDs vergibt CoreAudio pro Systemstart neu.
+  Zurückgeschrieben wird nur auf dasselbe Gerät. Der Fall, um den es geht: Lautsprecher
+  auf 100 %, Alarm läutet, der Nutzer setzt Kopfhörer auf — ein blindes `restore()`
+  schriebe die 1.0 des Lautsprechers ins Ohr.
+
+Passt das Gerät nicht, wird nichts geschrieben und die Datei bleibt liegen. Sie ist
+dann das Einzige, was den alten Zustand kennt: Liegt das Gerät beim nächsten Start
+wieder vorn, wird es dort leiser gedreht. Ein Schnappschuss aus einer älteren Version
+kennt kein Gerät und wird weiterhin angewandt — nichts zu tun wäre schlechter als der
+bisherige Stand, und der bisherige Stand ist genau dieses blinde Zurückschreiben.
+
+Was das nicht abdeckt: Lässt sich das aktuelle Gerät nicht benennen, obwohl der
+Schnappschuss eines nennt, wird nicht zurückgeschrieben, sondern auf den nächsten
+Start vertagt — es ist gerade nicht feststellbar, dass es dasselbe Gerät ist. Und der
+Schnappschuss wird zwar vor dem Anheben geschrieben, aber nur mit `try?`; scheitert das
+Schreiben, hebt alarmooh trotzdem an und kennt den alten Stand nur im Speicher. Ein
+harter Abbruch in diesem Zustand lässt die Lautstärke oben, ohne dass irgendetwas davon
+wüsste.
 
 ### Alarmton-Datei
 
@@ -323,6 +394,7 @@ beschreibbar, statt `UserDefaults`:
 - Sound-Pfad
 - Scan-Intervall
 - Nachholfrist (`catchUpGrace`)
+- Pause-Schalter und „Bei Anmeldung starten"
 
 Die Datei ist ausdrücklich von Hand editierbar, und das hat zwei Konsequenzen, die im
 Code stehen müssen:
@@ -339,10 +411,51 @@ Code stehen müssen:
   ist über `lastLoadFailed` abfragbar, damit der Nutzer gewarnt werden kann, statt
   still ohne Abos weiterzulaufen.
 
+Stummgeschaltete **Vorkommen** verfallen. Bei jedem Scan fallen Einträge weg, deren
+Startzeitpunkt länger als sieben Tage zurückliegt (`OccurrenceID.mutedRetention`); ohne
+das wüchse `mutedEventIDs` unbegrenzt, weil jedes weggeklickte Vorkommen einen Eintrag
+anlegt und nie einer entfernt wird. Drei Regeln dazu:
+
+- Die Grenze gehört noch dazu — „höchstens sieben Tage alt", dieselbe Lesart wie bei
+  `catchUpGrace`.
+- Was sich nicht lesen lässt, bleibt stehen. Eine unbekannte Kennung wegzuwerfen hieße,
+  etwas wieder scharf zu schalten, das der Nutzer ausdrücklich abgestellt hat.
+- Stummgeschaltete **Serien** werden nie angefasst. Sie tragen keinen Zeitpunkt und
+  gelten auf Dauer, bis der Nutzer sie im Fenster wieder scharf schaltet.
+
+Geschrieben wird die Datei dabei nur, wenn tatsächlich etwas wegfällt — sonst hätte
+jeder Scan eine Schreiblast, alle 30 Minuten und bei jeder Kalenderänderung. Bei
+defekter Datei läuft das Aufräumen gar nicht, dort wird grundsätzlich nicht geschrieben.
+
 Das Einstellungsfenster (SwiftUI in einem normalen Fenster) bietet: Kalenderliste mit
-Häkchen, Vorlaufzeit, Mindestlautstärke als Regler, Sound-Auswahl, die Mute-Liste mit
-der Möglichkeit, Einträge wieder scharf zu schalten, sowie „Bei Anmeldung starten"
-über `SMAppService`.
+Häkchen, „Nächste Termine", Vorlaufzeit, Mindestlautstärke als Regler samt Testton,
+Sound-Auswahl, die Mute-Liste mit der Möglichkeit, Einträge wieder scharf zu schalten,
+sowie „Bei Anmeldung starten" über `SMAppService`.
+
+**Nächste Termine** listet die nächsten zehn Termine der abonnierten Kalender, gesucht
+bis 60 Tage voraus — bewusst viel weiter als das 24-Stunden-Fenster des Alarm-Scans, denn
+wer alle zwei Wochen einen Serientermin hat, findet den zehnten sonst nie. Je Zeile
+Titel, Wochentag, Datum, Uhrzeit und Kalendername, dazu ein Schalter für das einzelne
+Vorkommen und bei Serienterminen ein zweiter für die ganze Serie.
+
+Der Abschnitt ist die einzige Stelle, an der ein Termin vorab stillgelegt werden kann.
+Ohne ihn ließe sich ein Serientermin nur stummschalten, während er läutet — man müsste
+den Alarm also erst über sich ergehen lassen, um ihn loszuwerden. Gefiltert wird
+mit `selectable` statt `alarmable`, damit stummgeschaltete Termine stehen bleiben; sonst
+käme man an den Schalter zum Wiedereinschalten gar nicht heran. Ist die Serie stumm, ist
+der Schalter des Vorkommens bedeutungslos: Er zeigt „aus", lässt sich nicht bedienen und
+die Zeile schreibt den Grund aus, statt ein „an" vorzugaukeln, das nichts bewirkt.
+Geschaltet wird über den Koordinator, also denselben Weg wie aus Menü und Alarmpanel,
+samt Abstellen eines gerade laufenden Alarms.
+
+**„Ton testen"** unter dem Lautstärkeregler spielt den Alarmton genau einmal und hebt
+die Systemlautstärke dafür genauso an wie ein echter Alarm — sonst hörte man irgendeinen
+Pegel, nur nicht den eingestellten. Vorgehört wird mit dem Stand aus dem Fenster und
+nicht mit dem gespeicherten, weil der Regler erst beim Loslassen schreibt. Während der
+Ton läuft, heißt der Knopf „Test stoppen"; er fällt von selbst zurück, wenn der Ton zu
+Ende ist. Der Stand kommt dafür vom Player und nie vom Klick — nur der weiß, wann der
+Ton aufhört, und ein geratener Timer läge bei jedem eigenen Alarmton daneben. Läuft
+gerade ein echter Alarm, passiert nichts: Der Alarm besitzt den Lautstärke-Schnappschuss.
 
 ## Build
 
@@ -350,8 +463,9 @@ der Möglichkeit, Einträge wieder scharf zu schalten, sowie „Bei Anmeldung st
 alarmooh/
 ├── Package.swift          # AlarmoohCore (lib) + alarmooh (exe) + Tests
 ├── Makefile               # make app / install / uninstall / run / test / clean
+├── LICENSE                # MIT, Lorenz Herbst, 2026
 ├── Scripts/
-│   ├── bundle.sh          # Release bauen und .build/Alarmooh.app zusammensetzen
+│   ├── bundle.sh          # Release bauen, .build/Alarmooh.app zusammensetzen, signieren
 │   └── Info.plist         # LSUIElement, Bundle-ID, Kalender-Nutzungstext
 ├── Sources/
 │   ├── AlarmoohCore/
@@ -359,8 +473,12 @@ alarmooh/
 └── Tests/AlarmoohCoreTests/
 ```
 
+Der Code steht unter der MIT-Lizenz (`LICENSE`, Lorenz Herbst, 2026). Eine selbst
+hinterlegte Tondatei ist davon nicht erfasst — sie liegt in Application Support und
+nicht im Repository.
+
 `make app` ruft `Scripts/bundle.sh` auf: Release bauen, `.build/Alarmooh.app` mit
-Info.plist anlegen, ad-hoc signieren. Das Bundle liegt im versteckten `.build/`, weil
+Info.plist anlegen, signieren. Das Bundle liegt im versteckten `.build/`, weil
 Spotlight Dot-Ordner nicht indexiert und die App sonst doppelt im Launchpad stünde.
 `make install` kopiert es nach `/Applications`, `make run` startet es von dort aus
 `.build/` heraus ohne Installation — bewusst über `open`, weil erst dadurch
@@ -373,9 +491,30 @@ EventKit gibt Kalenderdaten nur an ein signiertes App-Bundle mit Bundle-ID und
 bekommt keinen Zugriff. Die Bundle-ID (`io.github.lorautumn.alarmooh`) bleibt fest, damit macOS
 die einmal erteilte Berechtigung wiedererkennt.
 
-Bei Ad-hoc-Signatur ändert sich die Code-Identität mit jedem Build, weshalb macOS die
-Kalenderfrage gelegentlich erneut stellt. Ein einmalig angelegtes selbstsigniertes
-Zertifikat im Schlüsselbund behebt das, falls es stört.
+Signiert wird immer mit `--options runtime`, also mit Hardened Runtime, und mit
+`--timestamp=none` (der Zeitstempeldienst braucht Netz und nützt nur bei einer
+Notarisierung, die mit einem selbst ausgestellten Zertifikat ohnehin unmöglich ist).
+Die Hardened Runtime ist hier der eigentliche Schutz: alarmooh läuft dauerhaft mit
+erteiltem Kalender-Vollzugriff, und ohne sie kann sich jeder Prozess des angemeldeten
+Nutzers an sie hängen (Task-Port) oder sie mit `DYLD_INSERT_LIBRARIES` neu starten und
+den kompletten Kalender mitlesen — ohne eigene Nachfrage, weil die Berechtigung am
+Bundle hängt und nicht am fremden Prozess. Geprüft: `codesign -dvvv` meldet
+`flags=0x10002(adhoc,runtime)`, und `lldb -p` auf eine so signierte Kopie wird mit
+„Not allowed to attach to process" abgewiesen. Entitlements braucht die App keine.
+
+Die Signier-Identität wird in dieser Reihenfolge bestimmt:
+
+1. `ALARMOOH_SIGN_IDENTITY`, unverändert an `codesign --sign` gereicht.
+2. Sonst ein gültiges Code-Signing-Zertifikat aus dem Schlüsselbund, dessen Name
+   `alarmooh` enthält. Gefunden über `security find-identity -v -p codesigning`,
+   verwendet wird der Fingerabdruck und nicht der Name — der ist auch bei mehreren
+   gleichnamigen Zertifikaten eindeutig.
+3. Sonst ad hoc. Bewusst kein Fehler: Ohne Zertifikat muss der Build durchlaufen.
+
+Welcher Fall gegriffen hat, meldet das Skript als „Signatur: …". Bei Ad-hoc-Signatur
+ist die Code-Identität der cdhash des Binaries; der ändert sich mit jedem Build, macOS
+sieht jedes Mal eine fremde App und stellt die Kalenderfrage erneut. Ein einmalig
+angelegtes selbstsigniertes Zertifikat behebt genau das; die Schritte stehen im README.
 
 Stolperstein beim Übersetzen: `SystemVolumeController` braucht neben `CoreAudio` auch
 `import AudioToolbox`. `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` liegt
@@ -387,6 +526,17 @@ dort, nicht in `CoreAudio`.
 
 **Filter** — ganztägig entfällt, abgelehnt entfällt, stummgeschaltete Serie entfällt,
 Termin aus abonniertem Kalender bleibt.
+
+**Umfang der Abfrage** — die Quelle liefert nur Termine der genannten Kalender; eine
+leere Menge und eine Kennung, die es nicht mehr gibt, liefern beide nichts statt alles;
+Zeitfenster und Kalenderauswahl greifen zusammen.
+
+**Vorkommens-Kennung** — Aufbau und Zerlegung sind umkehrbar, Bruchteile von Sekunden
+fallen weg, zerlegt wird am letzten Trennzeichen; ohne oder mit unlesbarem Zeitstempel
+gibt es keinen Zeitpunkt. Dazu der Verfall: älter als sieben Tage fällt weg, genau auf
+der Grenze bleibt es stehen, eine Sekunde darüber nicht, Unlesbares und Serien bleiben
+unberührt, und ohne Änderung kommt dieselbe Menge zurück — daran hängt, dass nicht bei
+jedem Scan geschrieben wird.
 
 **Link-Extraktion** — Meet, Zoom, Teams aus URL-Feld, Notizen und Ort; ohne Link `nil`;
 Anbieter schlägt Abmeldelink; HTML-Entities; bloße Domain im Fließtext ist kein Link.
@@ -409,7 +559,9 @@ Differenz, dass die Ausblendung je Note nicht wegrationalisiert wurde.
 
 Panel, Menüleiste und die CoreAudio-Anbindung bleiben ungetestet und werden von Hand
 geprüft — ein Mock-Gerüst lohnt dafür nicht. Der Lautstärke-Snapshot, der einen
-Absturz überleben muss, ist dagegen getestet.
+Absturz überleben muss, ist dagegen getestet: Rundlauf mit Gerätekennung, eine Datei
+aus einer älteren Version ohne dieses Feld bleibt lesbar, eine ohne Lautstärke gilt als
+unbrauchbar, und derselbe Pegel auf einem anderen Gerät ist ein anderer Zustand.
 
 ## Bewusst weggelassen
 
@@ -427,17 +579,22 @@ Was die Implementierung nicht abdeckt:
 - `events(matching:)` von EventKit ist synchron und läuft auf dem Hauptthread.
   Gemessen 5–48 ms für das 24-Stunden-Fenster — bei dieser Größenordnung
   unproblematisch, aber nach oben nicht begrenzt.
-- Die Ad-hoc-Signatur ändert die App-Identität bei jedem Build, macOS kann die
-  Kalenderberechtigung deshalb erneut abfragen.
+- Ohne eigenes Zertifikat wird ad hoc signiert; dann ändert sich die App-Identität bei
+  jedem Build und macOS fragt die Kalenderberechtigung erneut ab. Mit einem
+  selbstsignierten Code-Signing-Zertifikat namens `alarmooh` im Schlüsselbund entfällt
+  das.
 - Abgesagt wird über den Teilnehmer mit `isCurrentUser` erkannt. Am Kalender des
   Nutzers gemessen hatten 4 von 40 Terminen Teilnehmer, aber keinen solchen Treffer;
   eine Absage unter einer zweiten Adresse bleibt dann unbemerkt.
 - Wird das Ausgabegerät gewechselt, während der Alarm läuft, bleibt das ursprüngliche
-  Gerät auf der angehobenen Lautstärke stehen.
-- `mutedEventIDs` wächst unbegrenzt. Jedes stummgeschaltete Vorkommen legt einen
-  dauerhaften Eintrag an, dessen Kennung den Startzeitpunkt enthält; nichts entfernt
-  Einträge, deren Termin längst vorbei ist. In der Praxis sind das Bytes pro Jahr, aber
-  die Mute-Liste im Einstellungsfenster füllt sich langsam mit toten Einträgen.
-- Die Mute-Liste im Einstellungsfenster zeigt die rohen Vorkommens-Kennungen
-  (etwa `…|1754485200`). Für einen Menschen, der entscheiden will, was er wieder scharf
-  schaltet, sind die nicht lesbar.
+  Gerät auf der angehobenen Lautstärke stehen: Die Wiederherstellung unterbleibt
+  bewusst, bis dieses Gerät wieder das Standardgerät ist. Auf das neue Gerät wird dabei
+  nie ein fremder Pegel geschrieben.
+- Der Scan läuft häufiger als geplant. Vorgesehen sind rund zwei Durchläufe pro Stunde
+  (Sicherheitstakt alle 30 Minuten), gemessen wurden etwa elf: `EKEventStoreChanged`
+  feuert alle 7 bis 19 Minuten und wird nicht zusammengefasst, und beim Aufwachen laufen
+  zwei Scans, weil sowohl `didWake` als auch `screensDidWake` beobachtet werden. Ein
+  Entprellen wurde bewusst nicht eingebaut: Die Kosten liegen bei etwa einer Sekunde CPU
+  pro Tag, die Beschränkung der Abfrage auf die abonnierten Kalender macht jeden Scan
+  ohnehin billiger, und eine Verzögerung würde eine echte Kalenderänderung später
+  ankommen lassen.
