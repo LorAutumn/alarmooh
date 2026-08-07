@@ -29,7 +29,7 @@ Kein Backend, kein Netzwerkzugriff, keine Konten. Ein einzelner lokaler Prozess.
 | Alarm-Darstellung | Schwebendes Panel unter dem Menüleisten-Icon | Über allen Fenstern und Spaces sichtbar, unabhängig von Fokus-Modus und Mitteilungszentrale. |
 | Alarmton | Datei in Application Support, ersatzweise ein zur Laufzeit erzeugter Ton | Die Tokioter Abfahrtsmelodien sind urheberrechtlich geschützt; privat abspielen ist unkritisch, im Repo verbreiten nicht. |
 | Lautstärke | Systemlautstärke temporär anheben, danach wiederherstellen | Volle App-Lautstärke allein bleibt bei leisem Mac unhörbar. |
-| Projektsetup | SPM plus `make bundle` | Git-freundlich und ohne Xcode baubar; EventKit verlangt trotzdem ein signiertes App-Bundle. |
+| Projektsetup | SPM plus `make app` | Git-freundlich und ohne Xcode baubar; EventKit verlangt trotzdem ein signiertes App-Bundle. |
 
 ## Architektur
 
@@ -285,21 +285,29 @@ der Möglichkeit, Einträge wieder scharf zu schalten, sowie „Bei Anmeldung st
 ```
 alarmooh/
 ├── Package.swift          # AlarmoohCore (lib) + alarmooh (exe) + Tests
-├── Makefile               # make bundle / run / test
-├── Resources/Info.plist   # LSUIElement, Bundle-ID, Kalender-Nutzungstext
+├── Makefile               # make app / install / uninstall / run / test / clean
+├── Scripts/
+│   ├── bundle.sh          # Release bauen und .build/Alarmooh.app zusammensetzen
+│   └── Info.plist         # LSUIElement, Bundle-ID, Kalender-Nutzungstext
 ├── Sources/
 │   ├── AlarmoohCore/
 │   └── alarmooh/
 └── Tests/AlarmoohCoreTests/
 ```
 
-`make bundle` baut Release, legt `Alarmooh.app` mit Info.plist an und signiert
-ad-hoc. `make run` startet sie, `make test` läuft ohne Bundle.
+`make app` ruft `Scripts/bundle.sh` auf: Release bauen, `.build/Alarmooh.app` mit
+Info.plist anlegen, ad-hoc signieren. Das Bundle liegt im versteckten `.build/`, weil
+Spotlight Dot-Ordner nicht indexiert und die App sonst doppelt im Launchpad stünde.
+`make install` kopiert es nach `/Applications`, `make run` startet es von dort aus
+`.build/` heraus ohne Installation — bewusst über `open`, weil erst dadurch
+LaunchServices das Bundle registriert, woran die Kalenderberechtigung hängt.
+`make uninstall` entfernt App, `~/Library/Application Support/alarmooh` und die
+erteilte Kalenderberechtigung. `make test` läuft ohne Bundle.
 
 EventKit gibt Kalenderdaten nur an ein signiertes App-Bundle mit Bundle-ID und
 `NSCalendarsFullAccessUsageDescription` heraus; ein nacktes `swift build`-Binary
-bekommt keinen Zugriff. Die Bundle-ID bleibt fest, damit macOS die einmal erteilte
-Berechtigung wiedererkennt.
+bekommt keinen Zugriff. Die Bundle-ID (`io.github.lorautumn.alarmooh`) bleibt fest, damit macOS
+die einmal erteilte Berechtigung wiedererkennt.
 
 Bei Ad-hoc-Signatur ändert sich die Code-Identität mit jedem Build, weshalb macOS die
 Kalenderfrage gelegentlich erneut stellt. Ein einmalig angelegtes selbstsigniertes

@@ -35,11 +35,19 @@ stimmt das nicht — ohne die Abhängigkeit endet der Build mit
 ## Bauen und starten
 
 ```
-make bundle    # Release bauen, Alarmooh.app zusammensetzen, ad-hoc signieren
-make run       # dasselbe und anschließend starten
-make test      # Tests gegen AlarmoohCore, ohne Bundle
-make clean     # .build und Alarmooh.app löschen
+make app        # Release bauen, .build/Alarmooh.app zusammensetzen, ad-hoc signieren
+make install    # dasselbe und nach /Applications kopieren
+make run        # dasselbe und aus .build/ starten, ohne zu installieren
+make test       # Tests gegen AlarmoohCore, ohne Bundle
+make uninstall  # App, Konfiguration und Kalenderberechtigung entfernen
+make clean      # .build löschen
 ```
+
+Das Bundle entsteht im versteckten `.build/`, weil Spotlight Dot-Ordner nicht
+indexiert — sonst stünde die App doppelt im Apps-Viewer beziehungsweise Launchpad.
+`make install` kopiert es nach `/Applications`; erst dort arbeitet auch „Bei Anmeldung
+starten" zuverlässig. `make uninstall` löscht neben der App auch
+`~/Library/Application Support/alarmooh`, also die gesamte Konfiguration.
 
 Ein nacktes `swift build`-Binary reicht nicht. EventKit gibt Kalenderdaten nur an ein
 signiertes App-Bundle heraus, das eine Bundle-ID und den Schlüssel
@@ -47,7 +55,7 @@ signiertes App-Bundle heraus, das eine Bundle-ID und den Schlüssel
 Kalender an. Die Bundle-ID (`io.github.lorautumn.alarmooh`) bleibt deshalb fest, damit
 macOS die einmal erteilte Berechtigung wiedererkennt.
 
-`make bundle` signiert ad-hoc (`codesign --sign -`). Damit ändert sich die
+`make app` signiert ad-hoc (`codesign --sign -`). Damit ändert sich die
 Code-Identität bei jedem Build, und macOS fragt die Kalenderberechtigung gelegentlich
 erneut ab. Wen das stört, der legt sich einmalig ein selbstsigniertes Zertifikat im
 Schlüsselbund an und signiert damit; dann bleibt die Identität über Builds hinweg
@@ -78,7 +86,7 @@ Weiter im Einstellungsfenster:
 - **Stummgeschaltet** — Liste der stillgelegten Serien und Termine, jeweils mit
   „Wieder alarmieren".
 - **Bei Anmeldung starten** — über `SMAppService`. Zuverlässig erst, wenn
-  `Alarmooh.app` in `/Applications` liegt.
+  `Alarmooh.app` in `/Applications` liegt, also nach `make install`.
 
 Der Ton läuft in Endlosschleife, bis einer der Knöpfe im Panel gedrückt wird. Es
 gibt bewusst kein Auto-Timeout und kein Snooze. Schläft der Rechner, feuert kein
@@ -119,8 +127,9 @@ Alles liegt in `~/Library/Application Support/alarmooh/`:
 
 ```
 Package.swift          AlarmoohCore (Library) + alarmooh (Executable) + Tests
-Makefile               bundle / run / test / clean
-Resources/Info.plist   LSUIElement, Bundle-ID, Kalender-Nutzungstext
+Makefile               app / install / uninstall / run / test / clean
+Scripts/bundle.sh      baut Release und setzt .build/Alarmooh.app zusammen
+Scripts/Info.plist     LSUIElement, Bundle-ID, Kalender-Nutzungstext
 Sources/AlarmoohCore/  UI-freie Logik
 Sources/alarmooh/      AppKit, EventKit, Audio, CoreAudio
 Tests/AlarmoohCoreTests/
