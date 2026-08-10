@@ -466,7 +466,8 @@ alarmooh/
 ├── LICENSE                # MIT, Lorenz Herbst, 2026
 ├── Scripts/
 │   ├── bundle.sh          # Release bauen, .build/Alarmooh.app zusammensetzen, signieren
-│   └── Info.plist         # LSUIElement, Bundle-ID, Kalender-Nutzungstext
+│   ├── Info.plist         # LSUIElement, Bundle-ID, Kalender-Nutzungstext
+│   └── alarmooh.entitlements  # com.apple.security.personal-information.calendars
 ├── Sources/
 │   ├── AlarmoohCore/
 │   └── alarmooh/
@@ -500,7 +501,31 @@ Nutzers an sie hängen (Task-Port) oder sie mit `DYLD_INSERT_LIBRARIES` neu star
 den kompletten Kalender mitlesen — ohne eigene Nachfrage, weil die Berechtigung am
 Bundle hängt und nicht am fremden Prozess. Geprüft: `codesign -dvvv` meldet
 `flags=0x10002(adhoc,runtime)`, und `lldb -p` auf eine so signierte Kopie wird mit
-„Not allowed to attach to process" abgewiesen. Entitlements braucht die App keine.
+„Not allowed to attach to process" abgewiesen.
+
+Die Hardened Runtime kostet dafür eine Berechtigung. Für den Kalender verlangt macOS
+unter ihr die Resource-Access-Berechtigung
+`com.apple.security.personal-information.calendars` — nicht bloß als
+App-Sandbox-Schlüssel, sondern als Bedingung der TCC-Policy. Sie steht in
+`Scripts/alarmooh.entitlements`, und `bundle.sh` signiert mit
+`--entitlements Scripts/alarmooh.entitlements`. Fehlt sie, lehnt tccd den Zugriff ohne
+Rückfrage ab:
+
+```
+Prompting policy for hardened runtime; service: kTCCServiceCalendar requires
+entitlement com.apple.security.personal-information.calendars but it is missing
+```
+
+Der Ausfall ist von außen nicht zu erkennen: Die App meldet „Kein Kalenderzugriff",
+während die Systemeinstellungen den Kalender für sie weiterhin als erlaubt führen.
+Wer die Datei als „ungenutzt" entfernt, bricht damit den Kalenderzugriff still.
+
+Lehre aus dem Fehlschlag: Eine TCC-Policy lässt sich nur über einen Start via
+LaunchServices prüfen, nicht über einen Start aus der Shell. TCC rechnet die Anfrage
+der verantwortlichen Anwendung zu; wird der Prozess aus dem Terminal gestartet, ist das
+das Terminal, und die Hardened-Runtime-Policy der App greift gar nicht erst. Die
+ursprüngliche Prüfung startete die Testkopie so und sah den Fehler deshalb nicht. Für
+jede Prüfung an Berechtigungen gilt: über `open` starten, sonst prüft man etwas anderes.
 
 Die Signier-Identität wird in dieser Reihenfolge bestimmt:
 

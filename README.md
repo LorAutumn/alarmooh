@@ -71,7 +71,20 @@ Kalender-Vollzugriff, und ohne Hardened Runtime kann sich jeder andere Prozess d
 angemeldeten Nutzers an sie hängen und über sie den gesamten Kalender mitlesen — ohne
 eigene Nachfrage, weil die Berechtigung am Bundle hängt. Mit Hardened Runtime wird
 etwa ein `lldb -p` auf den laufenden Prozess mit „Not allowed to attach to process"
-abgewiesen. Entitlements braucht die App dafür keine.
+abgewiesen.
+
+Die Hardened Runtime verlangt dafür eine Berechtigung: Für den Kalender fordert macOS
+die Resource-Access-Berechtigung `com.apple.security.personal-information.calendars`.
+Sie steht in `Scripts/alarmooh.entitlements`, und `Scripts/bundle.sh` signiert mit
+`--entitlements Scripts/alarmooh.entitlements`. Wird sie entfernt, bricht der
+Kalenderzugriff still weg: tccd lehnt ihn ohne Rückfrage ab, alarmooh meldet „Kein
+Kalenderzugriff", und die Systemeinstellungen zeigen den Zugriff trotzdem weiterhin als
+erlaubt an — der Fehler ist dort also nicht zu sehen. Die Meldung steht nur im Log:
+
+```
+Prompting policy for hardened runtime; service: kTCCServiceCalendar requires
+entitlement com.apple.security.personal-information.calendars but it is missing
+```
 
 Die Signier-Identität sucht `Scripts/bundle.sh` in dieser Reihenfolge:
 
@@ -223,6 +236,8 @@ Makefile               app / install / uninstall / run / test / clean
 LICENSE                MIT
 Scripts/bundle.sh      baut Release, setzt .build/Alarmooh.app zusammen, signiert
 Scripts/Info.plist     LSUIElement, Bundle-ID, Kalender-Nutzungstext
+Scripts/alarmooh.entitlements
+                       com.apple.security.personal-information.calendars
 Sources/AlarmoohCore/  UI-freie Logik
 Sources/alarmooh/      AppKit, EventKit, Audio, CoreAudio
 Tests/AlarmoohCoreTests/
