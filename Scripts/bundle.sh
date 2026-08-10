@@ -54,10 +54,20 @@ fi
 # und den kompletten Kalender mitlesen -- ohne eigene Nachfrage, weil die
 # Berechtigung am Bundle haengt und nicht am fremden Prozess.
 #
+# --entitlements gehoert zwingend dazu und darf nicht als "ungenutzt" entfernt
+# werden: unter der Hardened Runtime verlangt macOS fuer den Kalender zusaetzlich
+# die Resource-Access-Berechtigung com.apple.security.personal-information.calendars.
+# Fehlt sie, lehnt tccd den Zugriff ohne Rueckfrage ab, mit der Meldung
+#   "Prompting policy for hardened runtime; service: kTCCServiceCalendar requires
+#    entitlement com.apple.security.personal-information.calendars but it is missing"
+# und die App meldet "Kalenderzugriff verweigert", obwohl die Systemeinstellungen
+# den Zugriff weiterhin als erlaubt anzeigen.
+#
 # --timestamp=none: der Zeitstempel-Dienst von Apple braucht Netz und nuetzt
 # nur bei einer Notarisierung. Die ist mit einem selbst ausgestellten
 # Zertifikat ohnehin unmoeglich, also bleibt der Build offline lauffaehig.
-codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+codesign --force --options runtime --entitlements Scripts/alarmooh.entitlements \
+	--timestamp=none --sign "$IDENTITY" "$APP"
 
 echo "Signatur: $SIGNATUR"
 echo "Fertig: $APP"
