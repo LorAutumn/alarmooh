@@ -55,6 +55,8 @@ Zwei Targets, damit die Logik ohne UI testbar bleibt.
 ### alarmooh (Executable, AppKit mit SwiftUI-Views)
 
 - **`StatusItemController`** — Menüleisten-Icon und Menü.
+- **`BellIcon`** — zeichnet das Menüleisten-Symbol als Template-Bild, je Backing-Faktor
+  eine eigene Repräsentation.
 - **`AlarmPanelController`** — das schwebende Alarm-Fenster.
 - **`AlarmPlayer`** — schleifende Wiedergabe des Alarmtons, bis er abgestellt wird.
 - **`SystemVolumeController`** — CoreAudio, hebt und stellt die Ausgabelautstärke zurück.
@@ -227,9 +229,37 @@ nicht zusammengesetzt.
 
 ### Menüleisten-Icon
 
-Ein Template-Symbol (Glocke), das im Alarmzustand die Farbe wechselt. Das Menü zeigt
-den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst „Kein
-überwachter Termin"), den Schalter „Alarme pausieren" / „Alarme fortsetzen" — bei
+Das Symbol ist eine japanische Tempelglocke (bonshō), in Code gezeichnet (`BellIcon`)
+statt als Bilddatei mitgeliefert — dasselbe Prinzip wie beim Alarmton: Nichts Binäres
+kommt ins Repository.
+
+Gezeichnet wird ein Template-Bild, und das bestimmt die ganze Konstruktion. macOS wirft
+die Farben weg, wertet allein den Alphakanal aus und färbt jedes deckende Pixel ein. Die
+Linien im Inneren müssen deshalb echte Löcher im Alpha sein und dürfen nicht dunkle
+Pixel auf einem gefüllten Körper sein — genau daran scheiterte es, die Vorlage einfach
+zu übernehmen. Umgekehrt kostet der Alarmzustand nichts: dasselbe Bild, rot getönt, weil
+ein Template-Bild keine eigene Farbe mitbringt. Pausiert ist es dieselbe Glocke mit einem
+diagonalen Balken, um den beidseitig eine durchsichtige Schneise steht — ohne sie klebte
+er an Wand und Haube.
+
+Strichbreiten und Linienlagen rasten auf ganze Gerätepixel ein. Bei 18 pt sind das 36
+Gerätepixel; darin besteht das Band aus zwei 2-px-Linien mit 2 px Abstand, und das Loch
+in der Aufhängung misst 2 bis 4 px. Ohne das Einrasten verschmilzt das Band zu einem
+einzigen Balken und das Loch schließt sich. Aus demselben Grund liegt je Backing-Faktor
+(1×, 2×, 3×) eine eigene Repräsentation bei: Eine einzige, skalierungsunabhängige
+Zeichnung rastete auf das falsche Raster.
+
+Weggefallen sind die Katakana アラーム und die Punktreihen der Vorlage. Bei 36 px
+gemessen war die Zeichenspalte zu 26,7 % mittelgraue Zwischentöne, gegen 6,9 % bei
+256 px: nicht etwa schwer zu lesen, sondern gar kein Schriftzeichen mehr — Nebel, der
+zusätzlich die Silhouette abstumpft.
+
+Ehrlich bleibt: Das Band ist der empfindliche Teil und sitzt hart an der
+Auflösungsgrenze. Gibt es irgendwann nach, wird daraus ein einzelnes, dickeres Band —
+kaputt geht dabei nichts.
+
+Das Menü zeigt den nächsten überwachten Termin mit Uhrzeit („Nächster: … um …", sonst
+„Kein überwachter Termin"), den Schalter „Alarme pausieren" / „Alarme fortsetzen" — bei
 laufender Pause dazu ganz oben die graue Zeile „Alarme sind ausgeschaltet" — sowie
 „Einstellungen…" und „alarmooh beenden".
 Kein Dock-Icon und kein App-Switcher-Eintrag — geregelt über `LSUIElement`.

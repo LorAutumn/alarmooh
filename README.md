@@ -20,6 +20,11 @@ gefunden, öffnet ihn „Beitreten (Alarm entfällt)" und stellt denselben Termi
 wer früh beitritt, wird hinterher nicht doch noch angeschrien. „Für diesen Termin nicht
 alarmieren" tut dasselbe ohne Link; künftige Vorkommen der Serie bleiben scharf.
 
+In der Menüleiste sitzt dafür eine japanische Tempelglocke (bonshō). Sie liegt nicht
+als Bilddatei im Repository, sondern wird — wie der Alarmton — in Code gezeichnet, und
+zwar als Template-Bild: macOS färbt sie hell oder dunkel passend zur Menüleiste und
+während eines Alarms rot. Sind die Alarme pausiert, liegt ein diagonaler Balken darüber.
+
 Kein Backend, kein Netzwerkzugriff, kein OAuth, keine Konten. Ein einzelner lokaler
 Prozess, der zwischen zwei Alarmen nichts tut: aus jedem Kalender-Scan entsteht genau
 ein Timer auf den exakten Auslösezeitpunkt.
@@ -239,7 +244,7 @@ Scripts/Info.plist     LSUIElement, Bundle-ID, Kalender-Nutzungstext
 Scripts/alarmooh.entitlements
                        com.apple.security.personal-information.calendars
 Sources/AlarmoohCore/  UI-freie Logik
-Sources/alarmooh/      AppKit, EventKit, Audio, CoreAudio
+Sources/alarmooh/      AppKit, EventKit, Audio, CoreAudio, gezeichnetes Menüleisten-Symbol
 Tests/AlarmoohCoreTests/
 docs/plans/            Design- und Umsetzungsdokument
 ```
