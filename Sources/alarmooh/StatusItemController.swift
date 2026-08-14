@@ -55,10 +55,11 @@ final class StatusItemController {
     /// pausierter Wecker, den man fuer scharf haelt, ist der gefaehrlichste
     /// Zustand dieser App — deshalb ein anderes Symbol, nicht nur ein Menuetext.
     private func updateImage() {
-        let symbol = paused ? "bell.slash" : "bell.badge"
-        item.button?.image = NSImage(
-            systemSymbolName: symbol, accessibilityDescription: "alarmooh"
-        )
+        // Eigene Glocke statt SF Symbol: `BellIcon` zeichnet fuer jeden
+        // Backing-Faktor eine eigene Bitmap, deren Kanten auf ganze
+        // Geraetepixel eingerastet sind — bei 18 pt der Unterschied zwischen
+        // lesbar und Matsch.
+        item.button?.image = BellIcon.statusItemImage(paused: paused)
         // Template bleibt Pflicht: nur so faerbt `contentTintColor` das Symbol
         // waehrend eines laufenden Alarms rot.
         item.button?.image?.isTemplate = true
