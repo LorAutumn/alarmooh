@@ -519,7 +519,7 @@ erteilte Kalenderberechtigung. `make test` läuft ohne Bundle.
 
 EventKit gibt Kalenderdaten nur an ein signiertes App-Bundle mit Bundle-ID und
 `NSCalendarsFullAccessUsageDescription` heraus; ein nacktes `swift build`-Binary
-bekommt keinen Zugriff. Die Bundle-ID (`io.github.lorautumn.alarmooh`) bleibt fest, damit macOS
+bekommt keinen Zugriff. Die Bundle-ID (Standard `io.github.lorautumn.alarmooh`, überschreibbar über `ALARMOOH_BUNDLE_ID`) bleibt fest, damit macOS
 die einmal erteilte Berechtigung wiedererkennt.
 
 Signiert wird immer mit `--options runtime`, also mit Hardened Runtime, und mit

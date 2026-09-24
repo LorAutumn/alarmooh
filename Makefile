@@ -1,5 +1,8 @@
 .PHONY: app test install uninstall run clean
 
+# Muss zur Bundle-ID passen, mit der gebaut wurde (siehe Scripts/bundle.sh).
+BUNDLE_ID := $(or $(ALARMOOH_BUNDLE_ID),io.github.lorautumn.alarmooh)
+
 app:
 	Scripts/bundle.sh
 
@@ -21,7 +24,7 @@ uninstall:
 	-pkill -f Alarmooh.app
 	rm -rf /Applications/Alarmooh.app
 	rm -rf ~/Library/Application\ Support/alarmooh
-	-tccutil reset Calendar io.github.lorautumn.alarmooh
+	-tccutil reset Calendar $(BUNDLE_ID)
 	@echo "Deinstalliert (App, Konfiguration inkl. settings.json, Alarmton und"
 	@echo "Lautstaerke-Schnappschuss, sowie die erteilte Kalenderberechtigung)."
 

@@ -13,6 +13,12 @@ mkdir -p "$APP/Contents/MacOS"
 cp .build/release/alarmooh "$APP/Contents/MacOS/alarmooh"
 cp Scripts/Info.plist "$APP/Contents/Info.plist"
 
+# Bundle-ID: Vorgabe ueber ALARMOOH_BUNDLE_ID, sonst der Standardwert.
+# An ihr haengt die Kalenderberechtigung -- wer eine eigene ID setzt, muss sie
+# bei jedem Build gleich lassen, sonst fragt macOS erneut nach.
+BUNDLE_ID="${ALARMOOH_BUNDLE_ID:-io.github.lorautumn.alarmooh}"
+plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP/Contents/Info.plist"
+
 # --- Signier-Identitaet bestimmen ---
 #
 # Die Identitaet bestimmt, als *wer* die App gegenueber macOS auftritt, und
@@ -69,6 +75,7 @@ fi
 codesign --force --options runtime --entitlements Scripts/alarmooh.entitlements \
 	--timestamp=none --sign "$IDENTITY" "$APP"
 
+echo "Bundle-ID: $BUNDLE_ID"
 echo "Signatur: $SIGNATUR"
 echo "Fertig: $APP"
 echo "Installieren mit: make install  (kopiert nach /Applications)"

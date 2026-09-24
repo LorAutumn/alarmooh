@@ -67,8 +67,11 @@ starten" zuverlässig. `make uninstall` löscht neben der App auch
 Ein nacktes `swift build`-Binary reicht nicht. EventKit gibt Kalenderdaten nur an ein
 signiertes App-Bundle heraus, das eine Bundle-ID und den Schlüssel
 `NSCalendarsFullAccessUsageDescription` mitbringt; ohne Bundle kommt schlicht kein
-Kalender an. Die Bundle-ID (`io.github.lorautumn.alarmooh`) bleibt deshalb fest, damit
-macOS die einmal erteilte Berechtigung wiedererkennt.
+Kalender an. Die Bundle-ID bleibt deshalb über alle Builds fest, damit macOS die einmal
+erteilte Berechtigung wiedererkennt. Standard ist `io.github.lorautumn.alarmooh`; eine
+eigene lässt sich über die Umgebungsvariable `ALARMOOH_BUNDLE_ID` setzen, etwa
+`ALARMOOH_BUNDLE_ID=com.example.alarmooh make install`. Dann bei jedem Build und auch bei
+`make uninstall` dieselbe ID verwenden.
 
 `make app` signiert immer mit `--options runtime`, also mit eingeschalteter Hardened
 Runtime. Das ist hier kein Formalismus: alarmooh läuft dauerhaft mit erteiltem

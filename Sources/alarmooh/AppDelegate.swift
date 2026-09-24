@@ -3,7 +3,8 @@ import AppKit
 import OSLog
 
 // NSLog erscheint auf macOS 26 nicht mehr im Unified Log; OSLog schon.
-let log = Logger(subsystem: "io.github.lorautumn.alarmooh", category: "app")
+// Subsystem ist die Bundle-ID, mit der gebaut wurde (siehe Scripts/bundle.sh).
+let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "alarmooh", category: "app")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
