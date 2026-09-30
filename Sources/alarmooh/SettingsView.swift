@@ -302,7 +302,8 @@ struct SettingsView: View {
             Text(
                 "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
                 + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her. "
-                + "Als Kopfhörer gelten Bluetooth-Geräte und die Kopfhörerbuchse."
+                + "Als Kopfhörer gelten Geräte, die sich als Kopfhörer oder Headset melden (auch per USB), "
+                + "die Kopfhörerbuchse und alle Bluetooth-Geräte – auch Bluetooth-Lautsprecher."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)

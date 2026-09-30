@@ -67,7 +67,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         guard player == nil else { return }
         // Zweiter Klick startet neu, mit dem inzwischen eingestellten Wert.
         // Dafuer muss der alte Snapshot zurueck, bevor neu angehoben wird:
-        // `raise(to:)` ueberschreibt einen bestehenden Snapshot absichtlich nicht.
+        // `raise(for:)` ueberschreibt einen bestehenden Snapshot absichtlich nicht.
         stopPreview()
 
         // Scheitert das Laden, laeuft nichts — und der Knopf muss das erfahren,
