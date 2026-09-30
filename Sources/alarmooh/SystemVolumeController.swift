@@ -28,7 +28,9 @@ final class SystemVolumeController {
         if apply(snapshot) { snapshots.clear() }
     }
 
-    func raise(to minimum: Float) {
+    /// Hebt auf die Mindestlautstaerke an, die zum aktuellen Ausgabegeraet
+    /// passt: Kopfhoerer bekommen ihren eigenen, niedrigeren Wert.
+    func raise(for settings: Settings) {
         // Zweites `raise()` ohne `restore()` dazwischen: der gemerkte Zustand
         // ist bereits der originale des Nutzers. Wuerden wir jetzt neu messen,
         // schrieben wir die schon angehobene Lautstaerke als "vorher" fest und
@@ -39,6 +41,7 @@ final class SystemVolumeController {
         // das Standardgeraet wechseln — dann stammten Lautstaerke und
         // Stummschaltung eines Snapshots von zwei verschiedenen Geraeten.
         guard let device = outputDevice, let current = currentSnapshot(of: device) else { return }
+        let minimum = kind(of: device).minimumVolume(in: settings)
         activeSnapshot = current
         try? snapshots.save(current)
         if current.muted { setMuted(false, on: device) }
@@ -129,6 +132,58 @@ final class SystemVolumeController {
         let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &uid)
         guard status == noErr, let uid else { return nil }
         return uid.takeRetainedValue() as String
+    }
+
+    /// Kopfhoerer oder Lautsprecher. Laesst sich der Transportweg nicht lesen,
+    /// gilt das Geraet als Lautsprecher — lieber zu laut als verpasst.
+    private func kind(of device: AudioObjectID) -> OutputDeviceKind {
+        let transportType = uint32Property(
+            kAudioDevicePropertyTransportType, scope: kAudioObjectPropertyScopeGlobal, of: device
+        )
+        // Die Datenquelle meldet nur der eingebaute Ausgang, und nur sie
+        // verraet, ob etwas in der Klinkenbuchse steckt.
+        let dataSource = uint32Property(
+            kAudioDevicePropertyDataSource, scope: kAudioDevicePropertyScopeOutput, of: device
+        )
+        let terminalType = firstOutputStream(of: device).flatMap {
+            uint32Property(kAudioStreamPropertyTerminalType, scope: kAudioObjectPropertyScopeGlobal, of: $0)
+        }
+        let kind = OutputDeviceKind(
+            transportType: transportType ?? kAudioDeviceTransportTypeUnknown,
+            dataSource: dataSource,
+            terminalType: terminalType
+        )
+        log.info("Ausgabegeraet: \(kind == .headphones ? "Kopfhoerer" : "Lautsprecher", privacy: .public)")
+        return kind
+    }
+
+    /// Der Terminaltyp haengt am Stream, nicht am Geraet. Ein Ausgabegeraet
+    /// mit mehreren Streams ist selten; dann entscheidet der erste.
+    private func firstOutputStream(of device: AudioObjectID) -> AudioObjectID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr,
+              size >= UInt32(MemoryLayout<AudioObjectID>.size) else { return nil }
+        var streams = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &streams)
+        return status == noErr ? streams.first : nil
+    }
+
+    private func uint32Property(
+        _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope, of device: AudioObjectID
+    ) -> UInt32? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(device, &address) else { return nil }
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
+        return status == noErr ? value : nil
     }
 
     private func volumeAddress() -> AudioObjectPropertyAddress {

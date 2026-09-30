@@ -40,7 +40,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         newPlayer.volume = 1.0
         newPlayer.prepareToPlay()
 
-        volumeController.raise(to: settings.minimumVolume)
+        volumeController.raise(for: settings)
         player = newPlayer
         newPlayer.play()
     }
@@ -86,7 +86,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         newPlayer.delegate = self
         newPlayer.prepareToPlay()
 
-        volumeController.raise(to: settings.minimumVolume)
+        volumeController.raise(for: settings)
         previewPlayer = newPlayer
         newPlayer.play()
         notifyPreviewState(true)

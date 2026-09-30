@@ -297,18 +297,12 @@ struct SettingsView: View {
 
     private var volumeSection: some View {
         Section("Mindestlautstärke") {
-            HStack {
-                Slider(value: minimumVolume, in: 0...1) { editing in
-                    // Erst beim Loslassen schreiben, sonst eine Datei pro Pixel.
-                    if !editing { model.save() }
-                }
-                Text("\(Int((model.settings.minimumVolume * 100).rounded())) %")
-                    .monospacedDigit()
-                    .frame(width: 48, alignment: .trailing)
-            }
+            volumeSlider("Lautsprecher", value: minimumVolume)
+            volumeSlider("Kopfhörer", value: headphoneMinimumVolume)
             Text(
                 "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
-                + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her."
+                + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her. "
+                + "Als Kopfhörer gelten Bluetooth-Geräte und die Kopfhörerbuchse."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -316,11 +310,25 @@ struct SettingsView: View {
                 model.togglePreview()
             }
             Text(
-                "Spielt den Alarmton einmal mit der eingestellten Lautstärke. "
+                "Spielt den Alarmton einmal mit der Lautstärke für das gerade aktive Ausgabegerät. "
                 + "Danach gilt wieder die vorherige Systemlautstärke."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private func volumeSlider(_ label: String, value: Binding<Float>) -> some View {
+        LabeledContent(label) {
+            HStack {
+                Slider(value: value, in: 0...1) { editing in
+                    // Erst beim Loslassen schreiben, sonst eine Datei pro Pixel.
+                    if !editing { model.save() }
+                }
+                Text("\(Int((value.wrappedValue * 100).rounded())) %")
+                    .monospacedDigit()
+                    .frame(width: 48, alignment: .trailing)
+            }
         }
     }
 
@@ -378,6 +386,13 @@ struct SettingsView: View {
         Binding(
             get: { model.settings.minimumVolume },
             set: { model.settings.minimumVolume = $0 }
+        )
+    }
+
+    private var headphoneMinimumVolume: Binding<Float> {
+        Binding(
+            get: { model.settings.headphoneMinimumVolume },
+            set: { model.settings.headphoneMinimumVolume = $0 }
         )
     }
 

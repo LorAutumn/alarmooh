@@ -280,6 +280,7 @@ final class AlarmCoordinator {
         merged.subscribedCalendarIDs = incoming.subscribedCalendarIDs
         merged.leadTime = incoming.leadTime
         merged.minimumVolume = incoming.minimumVolume
+        merged.headphoneMinimumVolume = incoming.headphoneMinimumVolume
         merged.soundPath = incoming.soundPath
         merged.scanInterval = incoming.scanInterval
         merged.launchAtLogin = incoming.launchAtLogin

@@ -170,7 +170,14 @@ Weiter im Einstellungsfenster:
   Ist die Serie stumm, ist der Schalter des einzelnen Termins ausgegraut, und die Zeile
   sagt auch, warum.
 - **Vorlaufzeit** — 1 bis 15 Minuten, Standard 2.
-- **Mindestlautstärke** — Standard 80 %. Auf diesen Wert hebt alarmooh die
+- **Mindestlautstärke** — zwei Regler: Lautsprecher (Standard 80 %) und Kopfhörer
+  (Standard 30 %). Welcher gilt, entscheidet das Ausgabegerät beim Alarmstart
+  (`OutputDeviceKind`): Kopfhörer sind Geräte, deren Ausgabestream den Terminaltyp
+  Kopfhörer oder Headset meldet (so erkennt man etwa USB-C-EarPods, die sonst nur
+  „USB" wären), die Kopfhörerbuchse des eingebauten Ausgangs und alles über
+  Bluetooth. Bluetooth-Lautsprecher lassen sich davon nicht unterscheiden und
+  bekommen daher auch den Kopfhörerwert; alles andere, auch ein unbekanntes Gerät,
+  gilt als Lautsprecher — lieber zu laut als verpasst. Auf diesen Wert hebt alarmooh die
   Systemlautstärke für die Dauer des Alarms an, hebt eine Stummschaltung auf und
   stellt beides danach wieder her — auch beim Beenden der App mitten im Alarm
   („alarmooh beenden" ist die naheliegendste Reaktion auf einen Alarm, den man
@@ -178,7 +185,7 @@ Weiter im Einstellungsfenster:
   beim nächsten Start aus `volume-snapshot.json` zurückgesetzt, und zwar noch bevor
   nach dem Kalenderzugriff gefragt wird — das Zurücksetzen hat mit dem Kalender
   nichts zu tun und darf nicht daran hängen. Darunter steht „Ton testen": Der Alarmton
-  läuft einmal durch, mit derselben Anhebung und derselben Wiederherstellung wie bei
+  läuft einmal durch, mit derselben Anhebung (also mit dem Wert fürs gerade aktive Gerät) und derselben Wiederherstellung wie bei
   einem echten Alarm, und der Knopf heißt währenddessen „Test stoppen". Ist der Ton
   durch, steht von selbst wieder „Ton testen" da.
 - **Stummgeschaltet** — Liste der stillgelegten Serien und Termine, jeweils mit

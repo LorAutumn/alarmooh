@@ -57,6 +57,7 @@ private func load(json: String) throws -> Settings {
     #expect(settings.subscribedCalendarIDs == ["cal-work"])
     #expect(settings.leadTime == 300)
     #expect(settings.minimumVolume == Settings().minimumVolume)
+    #expect(settings.headphoneMinimumVolume == Settings().headphoneMinimumVolume)
     #expect(settings.scanInterval == Settings().scanInterval)
     #expect(settings.catchUpGrace == Settings().catchUpGrace)
     #expect(settings.launchAtLogin == Settings().launchAtLogin)
@@ -83,6 +84,11 @@ private func load(json: String) throws -> Settings {
 @Test func minimumVolumeIsClampedToUnitRange() throws {
     #expect(try load(json: #"{"minimumVolume": 8.0}"#).minimumVolume == 1)
     #expect(try load(json: #"{"minimumVolume": -1.0}"#).minimumVolume == 0)
+}
+
+@Test func headphoneMinimumVolumeIsClampedToUnitRange() throws {
+    #expect(try load(json: #"{"headphoneMinimumVolume": 8.0}"#).headphoneMinimumVolume == 1)
+    #expect(try load(json: #"{"headphoneMinimumVolume": -1.0}"#).headphoneMinimumVolume == 0)
 }
 
 @Test func tooShortScanIntervalIsClamped() throws {

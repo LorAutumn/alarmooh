@@ -35,7 +35,7 @@ Weitere Befehle: `make run` (starten ohne Installation), `make test`, `make unin
 **Alarm**
 - Standardmäßig zwei Minuten vor Terminbeginn, einstellbar von 1 bis 15 Minuten
 - Der Ton wiederholt sich, bis du reagierst, und hört von selbst auf, wenn der Termin schon zwei Minuten läuft
-- Die Systemlautstärke wird für den Alarm auf einen Mindestwert angehoben und danach zurückgestellt
+- Die Systemlautstärke wird für den Alarm auf einen Mindestwert angehoben und danach zurückgestellt – mit Kopfhörern auf einen eigenen, niedrigeren Wert
 - Kein Alarm, wenn der Rechner schläft oder zugeklappt ist
 
 **Beitreten**
