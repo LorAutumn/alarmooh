@@ -43,7 +43,7 @@ private func tempURL() -> URL {
 }
 
 @Test func defaultHeadphoneMinimumIsTenPercent() {
-    #expect(Settings().headphoneMinimumVolume == 0.1)
+    #expect(Settings().headphoneVolume == 0.1)
 }
 
 // MARK: - Toleranter Decoder
@@ -65,7 +65,7 @@ private func load(json: String) throws -> Settings {
     #expect(settings.subscribedCalendarIDs == ["cal-work"])
     #expect(settings.leadTime == 300)
     #expect(settings.minimumVolume == Settings().minimumVolume)
-    #expect(settings.headphoneMinimumVolume == Settings().headphoneMinimumVolume)
+    #expect(settings.headphoneVolume == Settings().headphoneVolume)
     #expect(settings.scanInterval == Settings().scanInterval)
     #expect(settings.catchUpGrace == Settings().catchUpGrace)
     #expect(settings.launchAtLogin == Settings().launchAtLogin)
@@ -94,9 +94,9 @@ private func load(json: String) throws -> Settings {
     #expect(try load(json: #"{"minimumVolume": -1.0}"#).minimumVolume == 0)
 }
 
-@Test func headphoneMinimumVolumeIsClampedToUnitRange() throws {
-    #expect(try load(json: #"{"headphoneMinimumVolume": 8.0}"#).headphoneMinimumVolume == 1)
-    #expect(try load(json: #"{"headphoneMinimumVolume": -1.0}"#).headphoneMinimumVolume == 0)
+@Test func headphoneVolumeIsClampedToUnitRange() throws {
+    #expect(try load(json: #"{"headphoneVolume": 8.0}"#).headphoneVolume == 1)
+    #expect(try load(json: #"{"headphoneVolume": -1.0}"#).headphoneVolume == 0)
 }
 
 @Test func tooShortScanIntervalIsClamped() throws {

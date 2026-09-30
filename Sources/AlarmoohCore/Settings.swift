@@ -11,9 +11,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var leadTime: TimeInterval = 120
     /// Auf diesen Wert wird die Systemlautstaerke beim Alarm mindestens angehoben.
     public var minimumVolume: Float = 0.5
-    /// Dasselbe fuer Kopfhoerer. Deutlich niedriger, weil der Ton direkt am
-    /// Ohr ankommt; siehe `OutputDeviceKind`.
-    public var headphoneMinimumVolume: Float = 0.1
+    /// Mit Kopfhoerern wird die Systemlautstaerke beim Alarm auf genau diesen
+    /// Wert gesetzt, auch nach unten. Deutlich niedriger, weil der Ton direkt
+    /// am Ohr ankommt; siehe `OutputDeviceKind.alarmVolume(current:in:)`.
+    public var headphoneVolume: Float = 0.1
     /// Pfad zur Audiodatei; nil bedeutet: erzeugten Fallback-Ton verwenden.
     public var soundPath: String?
     /// Sicherheitstakt fuer den Kalender-Scan.
@@ -75,10 +76,10 @@ public struct Settings: Codable, Equatable, Sendable {
             ),
             1
         )
-        headphoneMinimumVolume = min(
+        headphoneVolume = min(
             max(
-                try container.decodeIfPresent(Float.self, forKey: .headphoneMinimumVolume)
-                    ?? defaults.headphoneMinimumVolume, 0
+                try container.decodeIfPresent(Float.self, forKey: .headphoneVolume)
+                    ?? defaults.headphoneVolume, 0
             ),
             1
         )

@@ -1,8 +1,8 @@
 import CoreAudio
 
-/// Ob der Alarm im Raum oder im Ohr landet. Davon haengt ab, auf welchen Wert
-/// die Lautstaerke angehoben wird: 80 % aus dem Notebooklautsprecher sind ein
-/// Wecker, 80 % in Kopfhoerern tun weh.
+/// Ob der Alarm im Raum oder im Ohr landet. Davon haengt ab, welche Lautstaerke
+/// der Alarm bekommt: 80 % aus dem Notebooklautsprecher sind ein Wecker, 80 %
+/// in Kopfhoerern tun weh.
 public enum OutputDeviceKind: Equatable, Sendable {
     case speakers
     case headphones
@@ -49,10 +49,20 @@ public enum OutputDeviceKind: Equatable, Sendable {
         }
     }
 
-    public func minimumVolume(in settings: Settings) -> Float {
+    /// Die Lautstaerke, die fuer den Alarm eingestellt werden soll, oder nil,
+    /// wenn die aktuelle schon passt.
+    ///
+    /// Lautsprecher bekommen eine Untergrenze: war es leiser, wird angehoben,
+    /// war es lauter, bleibt es dabei — ein Alarm im Raum darf nicht untergehen.
+    /// Kopfhoerer bekommen genau den eingestellten Wert, auch nach unten: sonst
+    /// kaeme der Alarm bei laut gestellter Musik mit derselben Lautstaerke ins
+    /// Ohr, und der Regler waere kein Schutz.
+    public func alarmVolume(current: Float, in settings: Settings) -> Float? {
         switch self {
-        case .speakers: settings.minimumVolume
-        case .headphones: settings.headphoneMinimumVolume
+        case .speakers:
+            current < settings.minimumVolume ? settings.minimumVolume : nil
+        case .headphones:
+            current != settings.headphoneVolume ? settings.headphoneVolume : nil
         }
     }
 }

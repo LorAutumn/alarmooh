@@ -52,11 +52,24 @@ private func kind(
     #expect(kind(kAudioDeviceTransportTypeUnknown) == .speakers)
 }
 
-@Test func minimumVolumeFollowsDeviceKind() {
+private var volumes: Settings {
     var settings = Settings()
-    settings.minimumVolume = 0.8
-    settings.headphoneMinimumVolume = 0.3
+    settings.minimumVolume = 0.5
+    settings.headphoneVolume = 0.1
+    return settings
+}
 
-    #expect(OutputDeviceKind.speakers.minimumVolume(in: settings) == 0.8)
-    #expect(OutputDeviceKind.headphones.minimumVolume(in: settings) == 0.3)
+/// Lautsprecher: nur eine Untergrenze. Wer lauter gestellt hat, bleibt lauter.
+@Test func speakersAreOnlyRaisedToTheMinimum() {
+    #expect(OutputDeviceKind.speakers.alarmVolume(current: 0.2, in: volumes) == 0.5)
+    #expect(OutputDeviceKind.speakers.alarmVolume(current: 0.5, in: volumes) == nil)
+    #expect(OutputDeviceKind.speakers.alarmVolume(current: 0.9, in: volumes) == nil)
+}
+
+/// Kopfhoerer: genau der eingestellte Wert, notfalls auch herunter — sonst
+/// kaeme der Alarm bei laut gestellter Musik mit voller Lautstaerke ins Ohr.
+@Test func headphonesAreSetToExactlyTheConfiguredVolume() {
+    #expect(OutputDeviceKind.headphones.alarmVolume(current: 0.0, in: volumes) == 0.1)
+    #expect(OutputDeviceKind.headphones.alarmVolume(current: 0.8, in: volumes) == 0.1)
+    #expect(OutputDeviceKind.headphones.alarmVolume(current: 0.1, in: volumes) == nil)
 }

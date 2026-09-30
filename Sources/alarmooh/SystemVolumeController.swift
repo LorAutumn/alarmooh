@@ -28,8 +28,10 @@ final class SystemVolumeController {
         if apply(snapshot) { snapshots.clear() }
     }
 
-    /// Hebt auf die Mindestlautstaerke an, die zum aktuellen Ausgabegeraet
-    /// passt: Kopfhoerer bekommen ihren eigenen, niedrigeren Wert.
+    /// Stellt die Alarmlautstaerke fuer das aktuelle Ausgabegeraet ein:
+    /// Lautsprecher werden auf die Mindestlautstaerke angehoben, Kopfhoerer
+    /// auf genau ihren Wert gesetzt — dort also notfalls auch leiser gedreht.
+    /// Der Name ist von frueher geblieben, als es nur nach oben ging.
     func raise(for settings: Settings) {
         // Zweites `raise()` ohne `restore()` dazwischen: der gemerkte Zustand
         // ist bereits der originale des Nutzers. Wuerden wir jetzt neu messen,
@@ -41,11 +43,11 @@ final class SystemVolumeController {
         // das Standardgeraet wechseln — dann stammten Lautstaerke und
         // Stummschaltung eines Snapshots von zwei verschiedenen Geraeten.
         guard let device = outputDevice, let current = currentSnapshot(of: device) else { return }
-        let minimum = kind(of: device).minimumVolume(in: settings)
+        let target = kind(of: device).alarmVolume(current: current.volume, in: settings)
         activeSnapshot = current
         try? snapshots.save(current)
         if current.muted { setMuted(false, on: device) }
-        if current.volume < minimum { setVolume(minimum, on: device) }
+        if let target { setVolume(target, on: device) }
     }
 
     func restore() {

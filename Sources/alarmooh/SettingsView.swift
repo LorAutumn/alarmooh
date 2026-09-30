@@ -302,9 +302,9 @@ struct SettingsView: View {
     }
 
     private var volumeSection: some View {
-        Section("Mindestlautstärke") {
+        Section("Alarmlautstärke") {
             volumeSlider("Lautsprecher", value: minimumVolume)
-            volumeSlider("Kopfhörer", value: headphoneMinimumVolume)
+            volumeSlider("Kopfhörer", value: headphoneVolume)
             // Steht direkt am Regler statt nur im README: dort sieht ihn jeder,
             // der den Wert aendert. Die niedrige Voreinstellung schuetzt, der
             // Hinweis erklaert, warum man sie nicht leichtfertig hochzieht.
@@ -316,8 +316,9 @@ struct SettingsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             Text(
-                "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
-                + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her. "
+                "Für die Dauer eines Alarms hebt alarmooh die Systemlautstärke über Lautsprecher "
+                + "auf mindestens diesen Wert an. Über Kopfhörer stellt es genau diesen Wert ein, "
+                + "auch wenn es vorher lauter war. Danach gilt wieder der vorherige Wert. "
                 + "Als Kopfhörer gelten Geräte, die sich als Kopfhörer oder Headset melden (auch per USB), "
                 + "die Kopfhörerbuchse und alle Bluetooth-Geräte – auch Bluetooth-Lautsprecher."
             )
@@ -406,10 +407,10 @@ struct SettingsView: View {
         )
     }
 
-    private var headphoneMinimumVolume: Binding<Float> {
+    private var headphoneVolume: Binding<Float> {
         Binding(
-            get: { model.settings.headphoneMinimumVolume },
-            set: { model.settings.headphoneMinimumVolume = $0 }
+            get: { model.settings.headphoneVolume },
+            set: { model.settings.headphoneVolume = $0 }
         )
     }
 
