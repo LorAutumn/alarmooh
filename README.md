@@ -28,7 +28,8 @@ Weitere Befehle: `make run` (starten ohne Installation), `make test`, `make unin
 
 1. Beim ersten Start den Kalenderzugriff erlauben.
 2. Über das Glocken-Icon „Einstellungen…" öffnen und **mindestens einen Kalender anhaken**. Ohne Auswahl alarmiert alarmooh nichts.
-3. Optional: „Bei Anmeldung starten" einschalten.
+3. Unter „Mindestlautstärke" beide Regler einstellen – **Lautsprecher** und **Kopfhörer** – und jeweils mit „Ton testen" prüfen, am besten einmal mit und einmal ohne Kopfhörer. Der Alarm dreht die Systemlautstärke auf diesen Wert hoch, auch wenn du sie leiser gestellt hattest. Vor allem der Kopfhörer-Wert ist wichtig: Der Ton kommt direkt am Ohr an, und zu hohe Lautstärke kann das Gehör schädigen. Voreingestellt sind 50 % für Lautsprecher und 10 % für Kopfhörer.
+4. Optional: „Bei Anmeldung starten" einschalten.
 
 ## Funktionen
 
