@@ -212,7 +212,10 @@ Weiter im Einstellungsfenster:
   stellt beides danach wieder her — auch beim Beenden der App mitten im Alarm
   („alarmooh beenden" ist die naheliegendste Reaktion auf einen Alarm, den man
   loswerden will). Endete der letzte Lauf durch einen Absturz, wird die Lautstärke
-  beim nächsten Start aus `volume-snapshot.json` zurückgesetzt, und zwar noch bevor
+  beim nächsten Start aus `volume-snapshot.json` zurückgesetzt — aus der Datei aber nur
+  nach unten und ohne eine Stummschaltung aufzuheben, weil der Wert alt sein kann und
+  seit dem Kopfhörer-Verhalten oft die laute Musiklautstärke von damals ist; wieder
+  lauter stellt man selbst. Das geschieht noch bevor
   nach dem Kalenderzugriff gefragt wird — das Zurücksetzen hat mit dem Kalender
   nichts zu tun und darf nicht daran hängen. Darunter steht „Ton testen": Der Alarmton
   läuft einmal durch, mit derselben Lautstärke (also mit dem Wert fürs gerade aktive Gerät) und derselben Wiederherstellung wie bei

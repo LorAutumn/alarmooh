@@ -31,9 +31,20 @@ plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP/Contents/Info.plis
 TAG_PATTERN='v[0-9]*.[0-9]*.[0-9]*'
 if DESCRIBE=$(git describe --tags --match "$TAG_PATTERN" --always --dirty 2>/dev/null); then
 	TAG=$(git describe --tags --match "$TAG_PATTERN" --abbrev=0 2>/dev/null || true)
-	VERSION="${TAG#v}"
-	VERSION="${VERSION:-0.0.0}"
+	# Das Glob in --match laesst auch v1.2.3-rc1 oder v1.2.3.4 durch;
+	# CFBundleShortVersionString muss aber rein numerisch sein. Also nur den
+	# x.y.z-Anfang nehmen, sonst Platzhalter.
+	if [[ "${TAG#v}" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+		VERSION="${BASH_REMATCH[1]}"
+	else
+		VERSION="0.0.0"
+	fi
 	BUILD=$(git rev-list --count HEAD)
+	# In einem flachen Klon fehlen Commits und oft der Tag: die Build-Nummer
+	# waere zu klein und die Version 0.0.0. Kein Abbruch, aber sichtbar.
+	if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+		echo "Warnung: flacher Git-Klon -- Version und Build-Nummer sind unzuverlaessig (git fetch --unshallow --tags)" >&2
+	fi
 	plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 	plutil -replace CFBundleVersion -string "$BUILD" "$APP/Contents/Info.plist"
 	plutil -replace AlarmoohGitDescription -string "$DESCRIBE" "$APP/Contents/Info.plist"

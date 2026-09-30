@@ -94,6 +94,17 @@ private func load(json: String) throws -> Settings {
     #expect(try load(json: #"{"minimumVolume": -1.0}"#).minimumVolume == 0)
 }
 
+/// Der Schluessel hiess kurz `headphoneMinimumVolume`. Wer dort einen eigenen
+/// Wert hatte (etwa 100 % fuer eine Bluetooth-Box), darf nicht still auf den
+/// Standard zurueckfallen.
+@Test func legacyHeadphoneMinimumVolumeKeyIsStillRead() throws {
+    #expect(try load(json: #"{"headphoneMinimumVolume": 0.7}"#).headphoneVolume == 0.7)
+    // Der neue Schluessel hat Vorrang.
+    #expect(
+        try load(json: #"{"headphoneMinimumVolume": 0.7, "headphoneVolume": 0.2}"#).headphoneVolume == 0.2
+    )
+}
+
 @Test func headphoneVolumeIsClampedToUnitRange() throws {
     #expect(try load(json: #"{"headphoneVolume": 8.0}"#).headphoneVolume == 1)
     #expect(try load(json: #"{"headphoneVolume": -1.0}"#).headphoneVolume == 0)

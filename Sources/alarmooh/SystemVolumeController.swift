@@ -20,12 +20,16 @@ final class SystemVolumeController {
     /// Beim Start aufrufen: Falls ein Alarm durch einen Absturz beendet wurde,
     /// steht die Lautstaerke noch oben.
     ///
+    /// Zurueckgesetzt wird nur nach unten. Kopfhoerer, die der Alarm leiser
+    /// gedreht hatte, bleiben leise; wieder lauter stellt der Nutzer selbst.
+    /// Ein alter Wert aus der Datei soll nie ungefragt ins Ohr springen.
+    ///
     /// Die Datei wird nur geloescht, wenn sie auch angewandt wurde — sonst
     /// waere der einzige Hinweis auf ein noch lautes Geraet weg, ohne dass
-    /// jemand es leiser gedreht haette. Siehe `apply(_:)`.
+    /// jemand es leiser gedreht haette. Siehe `apply(_:allowLouder:)`.
     func restoreAfterCrashIfNeeded() {
         guard let snapshot = snapshots.load() else { return }
-        if apply(snapshot) { snapshots.clear() }
+        if apply(snapshot, allowLouder: false) { snapshots.clear() }
     }
 
     /// Stellt die Alarmlautstaerke fuer das aktuelle Ausgabegeraet ein:
@@ -46,13 +50,20 @@ final class SystemVolumeController {
         let target = kind(of: device).alarmVolume(current: current.volume, in: settings)
         activeSnapshot = current
         try? snapshots.save(current)
-        if current.muted { setMuted(false, on: device) }
+        // Erst die Lautstaerke, dann die Stummschaltung aufheben: andersherum
+        // kaeme laufende Musik fuer einen Moment mit der alten, bei Kopfhoerern
+        // oft deutlich hoeheren Lautstaerke durch.
         if let target { setVolume(target, on: device) }
+        if current.muted { setMuted(false, on: device) }
     }
 
     func restore() {
+        // Nur der Snapshot dieses Laufs ist sicher frisch und darf wieder
+        // lauter machen; einer aus der Datei kann alt sein. Siehe
+        // `VolumeSnapshot.restoreTarget(current:allowLouder:)`.
+        let fromThisRun = activeSnapshot != nil
         guard let snapshot = activeSnapshot ?? snapshots.load() else { return }
-        let restored = apply(snapshot)
+        let restored = apply(snapshot, allowLouder: fromThisRun)
         // Der Snapshot im Speicher geht in jedem Fall weg: er ist der Grund,
         // aus dem `raise()` nicht erneut misst, und bliebe er stehen, liesse
         // der naechste Alarm die Lautstaerke unangetastet und koennte sie auch
@@ -81,14 +92,17 @@ final class SystemVolumeController {
     /// Zurueckschreiben. Laesst sich umgekehrt das aktuelle Geraet nicht
     /// benennen, obwohl der Snapshot eines nennt, bleibt es beim Nichtstun —
     /// dann ist gerade nicht feststellbar, dass es dasselbe ist.
-    private func apply(_ snapshot: VolumeSnapshot) -> Bool {
+    private func apply(_ snapshot: VolumeSnapshot, allowLouder: Bool) -> Bool {
         guard let device = outputDevice else { return false }
         if let recorded = snapshot.deviceUID, recorded != deviceUID(of: device) {
             log.info("Ausgabegeraet gewechselt, Lautstaerke wird nicht zurueckgesetzt")
             return false
         }
-        setVolume(snapshot.volume, on: device)
-        setMuted(snapshot.muted, on: device)
+        let target = snapshot.restoreTarget(current: currentSnapshot(of: device), allowLouder: allowLouder)
+        // Stummschalten vor dem Lauterstellen, aus demselben Grund wie in `raise`.
+        if target.muted { setMuted(true, on: device) }
+        setVolume(target.volume, on: device)
+        if !target.muted { setMuted(false, on: device) }
         return true
     }
 

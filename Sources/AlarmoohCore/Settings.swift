@@ -76,9 +76,13 @@ public struct Settings: Codable, Equatable, Sendable {
             ),
             1
         )
+        // Hiess kurz `headphoneMinimumVolume`. Ohne den Rueckgriff fiele ein
+        // dort eigens gesetzter Wert still auf den Standard zurueck.
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
         headphoneVolume = min(
             max(
                 try container.decodeIfPresent(Float.self, forKey: .headphoneVolume)
+                    ?? legacy.decodeIfPresent(Float.self, forKey: .headphoneMinimumVolume)
                     ?? defaults.headphoneVolume, 0
             ),
             1
@@ -94,5 +98,11 @@ public struct Settings: Codable, Equatable, Sendable {
             try container.decodeIfPresent(TimeInterval.self, forKey: .catchUpGrace)
                 ?? defaults.catchUpGrace
         )
+    }
+
+    /// Nur gelesen, nie geschrieben: alte Namen, die eine fruehere Version in
+    /// die Datei geschrieben haben kann.
+    private enum LegacyCodingKeys: String, CodingKey {
+        case headphoneMinimumVolume
     }
 }
