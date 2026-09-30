@@ -202,7 +202,9 @@ Weiter im Einstellungsfenster:
   „USB" wären), die Kopfhörerbuchse des eingebauten Ausgangs und alles über
   Bluetooth. Bluetooth-Lautsprecher lassen sich davon nicht unterscheiden und
   bekommen daher auch den Kopfhörerwert; alles andere, auch ein unbekanntes Gerät,
-  gilt als Lautsprecher — lieber zu laut als verpasst. Auf diesen Wert hebt alarmooh die
+  gilt als Lautsprecher — lieber zu laut als verpasst. Direkt unter dem Kopfhörer-Regler
+  warnt ein Hinweis, dass hohe Lautstärke über Kopfhörer das Gehör schädigen kann; er
+  steht bewusst dort und nicht nur im README. Auf diesen Wert hebt alarmooh die
   Systemlautstärke für die Dauer des Alarms an, hebt eine Stummschaltung auf und
   stellt beides danach wieder her — auch beim Beenden der App mitten im Alarm
   („alarmooh beenden" ist die naheliegendste Reaktion auf einen Alarm, den man

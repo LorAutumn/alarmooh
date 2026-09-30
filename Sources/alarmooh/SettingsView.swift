@@ -305,6 +305,16 @@ struct SettingsView: View {
         Section("Mindestlautstärke") {
             volumeSlider("Lautsprecher", value: minimumVolume)
             volumeSlider("Kopfhörer", value: headphoneMinimumVolume)
+            // Steht direkt am Regler statt nur im README: dort sieht ihn jeder,
+            // der den Wert aendert. Die niedrige Voreinstellung schuetzt, der
+            // Hinweis erklaert, warum man sie nicht leichtfertig hochzieht.
+            Label(
+                "Hohe Lautstärke über Kopfhörer kann das Gehör schädigen. "
+                + "Wähle einen Wert, der sich mit „Ton testen\" angenehm anhört.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
             Text(
                 "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
                 + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her. "
