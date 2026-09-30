@@ -113,6 +113,31 @@ Ad-hoc-Signatur ist die Code-Identität der cdhash des Binaries; der ändert sic
 jedem Build, macOS sieht dann jedes Mal eine fremde App und fragt die
 Kalenderberechtigung erneut ab. Genau das behebt ein eigenes Zertifikat.
 
+## Versionen
+
+Die Version kommt allein aus Git-Tags der Form `v1.2.3` (Semantic Versioning). Im
+`Scripts/Info.plist` stehen nur Platzhalter (`0.0.0` / `0`); `Scripts/bundle.sh`
+überschreibt sie beim Bauen:
+
+- `CFBundleShortVersionString` — der letzte Tag ohne „v", etwa `0.2.0`
+- `CFBundleVersion` — die Anzahl der Commits, steigt also mit jedem Commit
+- `AlarmoohGitDescription` — die volle Ausgabe von `git describe --dirty`, etwa
+  `v0.2.0-3-gabc1234-dirty`
+
+Das Einstellungsfenster zeigt ganz unten „Version 0.2.0 (Build 57)" und hängt die
+`git describe`-Ausgabe nur an, wenn der Build nicht genau auf einem Tag liegt. So sieht
+man, ob in `/Applications` ein Release steckt oder ein Zwischenstand. Das Skript
+schreibt die Version außerdem als „Version: …" hin.
+
+Ein Release ist nur ein Tag auf `main`:
+
+```
+git tag -a v0.2.0 -m "alarmooh 0.2.0"
+git push origin v0.2.0
+```
+
+Neue Funktion → Minor-Version, reine Fehlerbehebung → Patch-Version.
+
 ## Signierzertifikat anlegen
 
 Einmalig, danach hören die wiederkehrenden Kalenderabfragen auf:

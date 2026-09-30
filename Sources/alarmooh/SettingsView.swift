@@ -213,6 +213,12 @@ struct SettingsView: View {
             soundSection
             mutedSection
             loginSection
+            Section {
+                Text(AppVersion.display(for: .main))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 620)
