@@ -28,14 +28,15 @@ Weitere Befehle: `make run` (starten ohne Installation), `make test`, `make unin
 
 1. Beim ersten Start den Kalenderzugriff erlauben.
 2. Über das Glocken-Icon „Einstellungen…" öffnen und **mindestens einen Kalender anhaken**. Ohne Auswahl alarmiert alarmooh nichts.
-3. Optional: „Bei Anmeldung starten" einschalten.
+3. Unter „Alarmlautstärke" beide Regler einstellen – **Lautsprecher** und **Kopfhörer** – und jeweils mit „Ton testen" prüfen, am besten einmal mit und einmal ohne Kopfhörer. Über Lautsprecher dreht der Alarm mindestens auf diesen Wert hoch, auch wenn du leiser gestellt hattest; über Kopfhörer stellt er genau diesen Wert ein, auch wenn es vorher lauter war. Vor allem der Kopfhörer-Wert ist wichtig: Der Ton kommt direkt am Ohr an, und zu hohe Lautstärke kann das Gehör schädigen. Voreingestellt sind 50 % für Lautsprecher und 10 % für Kopfhörer.
+4. Optional: „Bei Anmeldung starten" einschalten.
 
 ## Funktionen
 
 **Alarm**
 - Standardmäßig zwei Minuten vor Terminbeginn, einstellbar von 1 bis 15 Minuten
 - Der Ton wiederholt sich, bis du reagierst, und hört von selbst auf, wenn der Termin schon zwei Minuten läuft
-- Die Systemlautstärke wird für den Alarm auf einen Mindestwert angehoben und danach zurückgestellt
+- Die Systemlautstärke wird für den Alarm auf einen Mindestwert angehoben und danach zurückgestellt – mit Kopfhörern genau auf einen eigenen, niedrigeren Wert, notfalls auch leiser
 - Kein Alarm, wenn der Rechner schläft oder zugeklappt ist
 
 **Beitreten**

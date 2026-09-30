@@ -37,6 +37,26 @@ public struct VolumeSnapshot: Codable, Equatable, Sendable {
         muted = try container.decode(Bool.self, forKey: .muted)
         deviceUID = try container.decodeIfPresent(String.self, forKey: .deviceUID)
     }
+
+    /// Was beim Zuruecksetzen tatsaechlich geschrieben wird.
+    ///
+    /// `allowLouder` ist nur fuer den Snapshot gedacht, den derselbe Lauf eben
+    /// selbst gemessen hat: dann ist er frisch, und die Kopfhoerer, die fuer
+    /// den Alarm leiser gedreht wurden, sollen wieder so laut sein wie davor.
+    ///
+    /// Ein Snapshot aus der Datei kann dagegen alt sein — liegengeblieben nach
+    /// einem Geraetewechsel oder Absturz, waehrend der Nutzer inzwischen von
+    /// Hand leiser gestellt hat. Seit Kopfhoerer fuer den Alarm auch leiser
+    /// gedreht werden, steht darin oft die laute Musiklautstaerke von damals.
+    /// Deshalb dann nie lauter als jetzt und keine Stummschaltung aufheben:
+    /// leiser zuruecksetzen (der eigentliche Zweck nach einem angehobenen
+    /// Alarm) geht weiter, ein Sprung nach oben im Ohr nicht.
+    public func restoreTarget(current: VolumeSnapshot?, allowLouder: Bool) -> VolumeSnapshot {
+        guard !allowLouder, let current else { return self }
+        return VolumeSnapshot(
+            volume: min(volume, current.volume), muted: muted || current.muted, deviceUID: deviceUID
+        )
+    }
 }
 
 /// Haelt den Lautstaerkezustand vor einem Alarm fest, damit ein Absturz

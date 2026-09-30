@@ -40,7 +40,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         newPlayer.volume = 1.0
         newPlayer.prepareToPlay()
 
-        volumeController.raise(to: settings.minimumVolume)
+        volumeController.raise(for: settings)
         player = newPlayer
         newPlayer.play()
     }
@@ -67,7 +67,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         guard player == nil else { return }
         // Zweiter Klick startet neu, mit dem inzwischen eingestellten Wert.
         // Dafuer muss der alte Snapshot zurueck, bevor neu angehoben wird:
-        // `raise(to:)` ueberschreibt einen bestehenden Snapshot absichtlich nicht.
+        // `raise(for:)` ueberschreibt einen bestehenden Snapshot absichtlich nicht.
         stopPreview()
 
         // Scheitert das Laden, laeuft nichts — und der Knopf muss das erfahren,
@@ -86,7 +86,7 @@ final class AlarmPlayer: NSObject, AVAudioPlayerDelegate {
         newPlayer.delegate = self
         newPlayer.prepareToPlay()
 
-        volumeController.raise(to: settings.minimumVolume)
+        volumeController.raise(for: settings)
         previewPlayer = newPlayer
         newPlayer.play()
         notifyPreviewState(true)

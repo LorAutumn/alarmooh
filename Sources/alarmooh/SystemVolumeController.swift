@@ -20,15 +20,23 @@ final class SystemVolumeController {
     /// Beim Start aufrufen: Falls ein Alarm durch einen Absturz beendet wurde,
     /// steht die Lautstaerke noch oben.
     ///
+    /// Zurueckgesetzt wird nur nach unten. Kopfhoerer, die der Alarm leiser
+    /// gedreht hatte, bleiben leise; wieder lauter stellt der Nutzer selbst.
+    /// Ein alter Wert aus der Datei soll nie ungefragt ins Ohr springen.
+    ///
     /// Die Datei wird nur geloescht, wenn sie auch angewandt wurde — sonst
     /// waere der einzige Hinweis auf ein noch lautes Geraet weg, ohne dass
-    /// jemand es leiser gedreht haette. Siehe `apply(_:)`.
+    /// jemand es leiser gedreht haette. Siehe `apply(_:allowLouder:)`.
     func restoreAfterCrashIfNeeded() {
         guard let snapshot = snapshots.load() else { return }
-        if apply(snapshot) { snapshots.clear() }
+        if apply(snapshot, allowLouder: false) { snapshots.clear() }
     }
 
-    func raise(to minimum: Float) {
+    /// Stellt die Alarmlautstaerke fuer das aktuelle Ausgabegeraet ein:
+    /// Lautsprecher werden auf die Mindestlautstaerke angehoben, Kopfhoerer
+    /// auf genau ihren Wert gesetzt — dort also notfalls auch leiser gedreht.
+    /// Der Name ist von frueher geblieben, als es nur nach oben ging.
+    func raise(for settings: Settings) {
         // Zweites `raise()` ohne `restore()` dazwischen: der gemerkte Zustand
         // ist bereits der originale des Nutzers. Wuerden wir jetzt neu messen,
         // schrieben wir die schon angehobene Lautstaerke als "vorher" fest und
@@ -39,15 +47,23 @@ final class SystemVolumeController {
         // das Standardgeraet wechseln — dann stammten Lautstaerke und
         // Stummschaltung eines Snapshots von zwei verschiedenen Geraeten.
         guard let device = outputDevice, let current = currentSnapshot(of: device) else { return }
+        let target = kind(of: device).alarmVolume(current: current.volume, in: settings)
         activeSnapshot = current
         try? snapshots.save(current)
+        // Erst die Lautstaerke, dann die Stummschaltung aufheben: andersherum
+        // kaeme laufende Musik fuer einen Moment mit der alten, bei Kopfhoerern
+        // oft deutlich hoeheren Lautstaerke durch.
+        if let target { setVolume(target, on: device) }
         if current.muted { setMuted(false, on: device) }
-        if current.volume < minimum { setVolume(minimum, on: device) }
     }
 
     func restore() {
+        // Nur der Snapshot dieses Laufs ist sicher frisch und darf wieder
+        // lauter machen; einer aus der Datei kann alt sein. Siehe
+        // `VolumeSnapshot.restoreTarget(current:allowLouder:)`.
+        let fromThisRun = activeSnapshot != nil
         guard let snapshot = activeSnapshot ?? snapshots.load() else { return }
-        let restored = apply(snapshot)
+        let restored = apply(snapshot, allowLouder: fromThisRun)
         // Der Snapshot im Speicher geht in jedem Fall weg: er ist der Grund,
         // aus dem `raise()` nicht erneut misst, und bliebe er stehen, liesse
         // der naechste Alarm die Lautstaerke unangetastet und koennte sie auch
@@ -76,14 +92,17 @@ final class SystemVolumeController {
     /// Zurueckschreiben. Laesst sich umgekehrt das aktuelle Geraet nicht
     /// benennen, obwohl der Snapshot eines nennt, bleibt es beim Nichtstun —
     /// dann ist gerade nicht feststellbar, dass es dasselbe ist.
-    private func apply(_ snapshot: VolumeSnapshot) -> Bool {
+    private func apply(_ snapshot: VolumeSnapshot, allowLouder: Bool) -> Bool {
         guard let device = outputDevice else { return false }
         if let recorded = snapshot.deviceUID, recorded != deviceUID(of: device) {
             log.info("Ausgabegeraet gewechselt, Lautstaerke wird nicht zurueckgesetzt")
             return false
         }
-        setVolume(snapshot.volume, on: device)
-        setMuted(snapshot.muted, on: device)
+        let target = snapshot.restoreTarget(current: currentSnapshot(of: device), allowLouder: allowLouder)
+        // Stummschalten vor dem Lauterstellen, aus demselben Grund wie in `raise`.
+        if target.muted { setMuted(true, on: device) }
+        setVolume(target.volume, on: device)
+        if !target.muted { setMuted(false, on: device) }
         return true
     }
 
@@ -129,6 +148,58 @@ final class SystemVolumeController {
         let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &uid)
         guard status == noErr, let uid else { return nil }
         return uid.takeRetainedValue() as String
+    }
+
+    /// Kopfhoerer oder Lautsprecher. Laesst sich der Transportweg nicht lesen,
+    /// gilt das Geraet als Lautsprecher — lieber zu laut als verpasst.
+    private func kind(of device: AudioObjectID) -> OutputDeviceKind {
+        let transportType = uint32Property(
+            kAudioDevicePropertyTransportType, scope: kAudioObjectPropertyScopeGlobal, of: device
+        )
+        // Die Datenquelle meldet nur der eingebaute Ausgang, und nur sie
+        // verraet, ob etwas in der Klinkenbuchse steckt.
+        let dataSource = uint32Property(
+            kAudioDevicePropertyDataSource, scope: kAudioDevicePropertyScopeOutput, of: device
+        )
+        let terminalType = firstOutputStream(of: device).flatMap {
+            uint32Property(kAudioStreamPropertyTerminalType, scope: kAudioObjectPropertyScopeGlobal, of: $0)
+        }
+        let kind = OutputDeviceKind(
+            transportType: transportType ?? kAudioDeviceTransportTypeUnknown,
+            dataSource: dataSource,
+            terminalType: terminalType
+        )
+        log.info("Ausgabegeraet: \(kind == .headphones ? "Kopfhoerer" : "Lautsprecher", privacy: .public)")
+        return kind
+    }
+
+    /// Der Terminaltyp haengt am Stream, nicht am Geraet. Ein Ausgabegeraet
+    /// mit mehreren Streams ist selten; dann entscheidet der erste.
+    private func firstOutputStream(of device: AudioObjectID) -> AudioObjectID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr,
+              size >= UInt32(MemoryLayout<AudioObjectID>.size) else { return nil }
+        var streams = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &streams)
+        return status == noErr ? streams.first : nil
+    }
+
+    private func uint32Property(
+        _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope, of device: AudioObjectID
+    ) -> UInt32? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(device, &address) else { return nil }
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
+        return status == noErr ? value : nil
     }
 
     private func volumeAddress() -> AudioObjectPropertyAddress {

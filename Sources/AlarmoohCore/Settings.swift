@@ -10,7 +10,11 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Vorlauf vor Terminbeginn.
     public var leadTime: TimeInterval = 120
     /// Auf diesen Wert wird die Systemlautstaerke beim Alarm mindestens angehoben.
-    public var minimumVolume: Float = 0.8
+    public var minimumVolume: Float = 0.5
+    /// Mit Kopfhoerern wird die Systemlautstaerke beim Alarm auf genau diesen
+    /// Wert gesetzt, auch nach unten. Deutlich niedriger, weil der Ton direkt
+    /// am Ohr ankommt; siehe `OutputDeviceKind.alarmVolume(current:in:)`.
+    public var headphoneVolume: Float = 0.1
     /// Pfad zur Audiodatei; nil bedeutet: erzeugten Fallback-Ton verwenden.
     public var soundPath: String?
     /// Sicherheitstakt fuer den Kalender-Scan.
@@ -72,6 +76,17 @@ public struct Settings: Codable, Equatable, Sendable {
             ),
             1
         )
+        // Hiess kurz `headphoneMinimumVolume`. Ohne den Rueckgriff fiele ein
+        // dort eigens gesetzter Wert still auf den Standard zurueck.
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        headphoneVolume = min(
+            max(
+                try container.decodeIfPresent(Float.self, forKey: .headphoneVolume)
+                    ?? legacy.decodeIfPresent(Float.self, forKey: .headphoneMinimumVolume)
+                    ?? defaults.headphoneVolume, 0
+            ),
+            1
+        )
         // Unter einer Minute waere der Sicherheitstakt reine Last.
         scanInterval = max(
             60,
@@ -83,5 +98,11 @@ public struct Settings: Codable, Equatable, Sendable {
             try container.decodeIfPresent(TimeInterval.self, forKey: .catchUpGrace)
                 ?? defaults.catchUpGrace
         )
+    }
+
+    /// Nur gelesen, nie geschrieben: alte Namen, die eine fruehere Version in
+    /// die Datei geschrieben haben kann.
+    private enum LegacyCodingKeys: String, CodingKey {
+        case headphoneMinimumVolume
     }
 }

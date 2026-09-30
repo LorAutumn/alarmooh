@@ -19,6 +19,40 @@ cp Scripts/Info.plist "$APP/Contents/Info.plist"
 BUNDLE_ID="${ALARMOOH_BUNDLE_ID:-io.github.lorautumn.alarmooh}"
 plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP/Contents/Info.plist"
 
+# --- Version aus Git ---
+#
+# Einzige Quelle sind Tags der Form v1.2.3; im Info.plist stehen nur
+# Platzhalter (0.0.0 / 0), die nur ein Build ausserhalb von Git behaelt.
+#   CFBundleShortVersionString  letzter Tag ohne "v"            -> 0.2.0
+#   CFBundleVersion             Anzahl Commits, steigt immer     -> 57
+#   AlarmoohGitDescription      volle git-describe-Ausgabe       -> v0.2.0-3-gabc1234-dirty
+# Den letzten Wert zeigt das Einstellungsfenster nur, wenn der Build nicht
+# genau auf einem Tag liegt (AppVersion.display).
+TAG_PATTERN='v[0-9]*.[0-9]*.[0-9]*'
+if DESCRIBE=$(git describe --tags --match "$TAG_PATTERN" --always --dirty 2>/dev/null); then
+	TAG=$(git describe --tags --match "$TAG_PATTERN" --abbrev=0 2>/dev/null || true)
+	# Das Glob in --match laesst auch v1.2.3-rc1 oder v1.2.3.4 durch;
+	# CFBundleShortVersionString muss aber rein numerisch sein. Also nur den
+	# x.y.z-Anfang nehmen, sonst Platzhalter.
+	if [[ "${TAG#v}" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+		VERSION="${BASH_REMATCH[1]}"
+	else
+		VERSION="0.0.0"
+	fi
+	BUILD=$(git rev-list --count HEAD)
+	# In einem flachen Klon fehlen Commits und oft der Tag: die Build-Nummer
+	# waere zu klein und die Version 0.0.0. Kein Abbruch, aber sichtbar.
+	if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+		echo "Warnung: flacher Git-Klon -- Version und Build-Nummer sind unzuverlaessig (git fetch --unshallow --tags)" >&2
+	fi
+	plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
+	plutil -replace CFBundleVersion -string "$BUILD" "$APP/Contents/Info.plist"
+	plutil -replace AlarmoohGitDescription -string "$DESCRIBE" "$APP/Contents/Info.plist"
+else
+	VERSION="unbekannt (kein Git)"
+	DESCRIBE="-"
+fi
+
 # --- Signier-Identitaet bestimmen ---
 #
 # Die Identitaet bestimmt, als *wer* die App gegenueber macOS auftritt, und
@@ -76,6 +110,7 @@ codesign --force --options runtime --entitlements Scripts/alarmooh.entitlements 
 	--timestamp=none --sign "$IDENTITY" "$APP"
 
 echo "Bundle-ID: $BUNDLE_ID"
+echo "Version: $VERSION ($DESCRIBE)"
 echo "Signatur: $SIGNATUR"
 echo "Fertig: $APP"
 echo "Installieren mit: make install  (kopiert nach /Applications)"

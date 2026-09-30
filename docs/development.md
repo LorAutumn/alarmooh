@@ -113,6 +113,31 @@ Ad-hoc-Signatur ist die Code-Identität der cdhash des Binaries; der ändert sic
 jedem Build, macOS sieht dann jedes Mal eine fremde App und fragt die
 Kalenderberechtigung erneut ab. Genau das behebt ein eigenes Zertifikat.
 
+## Versionen
+
+Die Version kommt allein aus Git-Tags der Form `v1.2.3` (Semantic Versioning). Im
+`Scripts/Info.plist` stehen nur Platzhalter (`0.0.0` / `0`); `Scripts/bundle.sh`
+überschreibt sie beim Bauen:
+
+- `CFBundleShortVersionString` — der letzte Tag ohne „v", etwa `0.2.0`
+- `CFBundleVersion` — die Anzahl der Commits, steigt also mit jedem Commit
+- `AlarmoohGitDescription` — die volle Ausgabe von `git describe --dirty`, etwa
+  `v0.2.0-3-gabc1234-dirty`
+
+Das Einstellungsfenster zeigt ganz unten „Version 0.2.0 (Build 57)" und hängt die
+`git describe`-Ausgabe nur an, wenn der Build nicht genau auf einem Tag liegt. So sieht
+man, ob in `/Applications` ein Release steckt oder ein Zwischenstand. Das Skript
+schreibt die Version außerdem als „Version: …" hin.
+
+Ein Release ist nur ein Tag auf `main`:
+
+```
+git tag -a v0.2.0 -m "alarmooh 0.2.0"
+git push origin v0.2.0
+```
+
+Neue Funktion → Minor-Version, reine Fehlerbehebung → Patch-Version.
+
 ## Signierzertifikat anlegen
 
 Einmalig, danach hören die wiederkehrenden Kalenderabfragen auf:
@@ -170,15 +195,30 @@ Weiter im Einstellungsfenster:
   Ist die Serie stumm, ist der Schalter des einzelnen Termins ausgegraut, und die Zeile
   sagt auch, warum.
 - **Vorlaufzeit** — 1 bis 15 Minuten, Standard 2.
-- **Mindestlautstärke** — Standard 80 %. Auf diesen Wert hebt alarmooh die
-  Systemlautstärke für die Dauer des Alarms an, hebt eine Stummschaltung auf und
+- **Alarmlautstärke** — zwei Regler: Lautsprecher (Standard 50 %) und Kopfhörer
+  (Standard 10 %). Der Lautsprecherwert ist eine Untergrenze: war es leiser, wird
+  angehoben, war es lauter, bleibt es dabei. Der Kopfhörerwert wird genau eingestellt,
+  also notfalls auch leiser gedreht — sonst käme der Alarm bei laut gestellter Musik
+  mit derselben Lautstärke ins Ohr (`OutputDeviceKind.alarmVolume(current:in:)`). Welcher gilt, entscheidet das Ausgabegerät beim Alarmstart
+  (`OutputDeviceKind`): Kopfhörer sind Geräte, deren Ausgabestream den Terminaltyp
+  Kopfhörer oder Headset meldet (so erkennt man etwa USB-C-EarPods, die sonst nur
+  „USB" wären), die Kopfhörerbuchse des eingebauten Ausgangs und alles über
+  Bluetooth. Bluetooth-Lautsprecher lassen sich davon nicht unterscheiden und
+  bekommen daher auch den Kopfhörerwert; alles andere, auch ein unbekanntes Gerät,
+  gilt als Lautsprecher — lieber zu laut als verpasst. Direkt unter dem Kopfhörer-Regler
+  warnt ein Hinweis, dass hohe Lautstärke über Kopfhörer das Gehör schädigen kann; er
+  steht bewusst dort und nicht nur im README. Für die Dauer des Alarms stellt alarmooh
+  die Systemlautstärke so ein, hebt eine Stummschaltung auf und
   stellt beides danach wieder her — auch beim Beenden der App mitten im Alarm
   („alarmooh beenden" ist die naheliegendste Reaktion auf einen Alarm, den man
   loswerden will). Endete der letzte Lauf durch einen Absturz, wird die Lautstärke
-  beim nächsten Start aus `volume-snapshot.json` zurückgesetzt, und zwar noch bevor
+  beim nächsten Start aus `volume-snapshot.json` zurückgesetzt — aus der Datei aber nur
+  nach unten und ohne eine Stummschaltung aufzuheben, weil der Wert alt sein kann und
+  seit dem Kopfhörer-Verhalten oft die laute Musiklautstärke von damals ist; wieder
+  lauter stellt man selbst. Das geschieht noch bevor
   nach dem Kalenderzugriff gefragt wird — das Zurücksetzen hat mit dem Kalender
   nichts zu tun und darf nicht daran hängen. Darunter steht „Ton testen": Der Alarmton
-  läuft einmal durch, mit derselben Anhebung und derselben Wiederherstellung wie bei
+  läuft einmal durch, mit derselben Lautstärke (also mit dem Wert fürs gerade aktive Gerät) und derselben Wiederherstellung wie bei
   einem echten Alarm, und der Knopf heißt währenddessen „Test stoppen". Ist der Ton
   durch, steht von selbst wieder „Ton testen" da.
 - **Stummgeschaltet** — Liste der stillgelegten Serien und Termine, jeweils mit

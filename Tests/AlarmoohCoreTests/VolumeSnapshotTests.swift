@@ -81,3 +81,51 @@ private func tempURL() -> URL {
     #expect(speakers != VolumeSnapshot(volume: 1.0, muted: false))
     #expect(VolumeSnapshot(volume: 1.0, muted: false) == VolumeSnapshot(volume: 1.0, muted: false))
 }
+
+// MARK: - Zuruecksetzen
+
+/// Nach einem Alarm im selben Lauf: der Zustand von vorher kommt voll zurueck,
+/// auch wenn das lauter ist — die Kopfhoerer standen vor dem Alarm auf 0,8.
+@Test func restoreFromThisRunMayBeLouder() {
+    let before = VolumeSnapshot(volume: 0.8, muted: false, deviceUID: "EarPods")
+    let now = VolumeSnapshot(volume: 0.1, muted: false, deviceUID: "EarPods")
+
+    #expect(before.restoreTarget(current: now, allowLouder: true) == before)
+}
+
+/// Aus der Datei (Absturz oder liegengebliebener Snapshot): der Wert kann alt
+/// sein, und der Nutzer hat inzwischen vielleicht leiser gestellt. Dann nie
+/// lauter als jetzt — sonst kaemen 0,8 von gestern ins Ohr.
+@Test func restoreFromFileIsNeverLouder() {
+    let stale = VolumeSnapshot(volume: 0.8, muted: false, deviceUID: "EarPods")
+    let now = VolumeSnapshot(volume: 0.2, muted: false, deviceUID: "EarPods")
+
+    #expect(stale.restoreTarget(current: now, allowLouder: false).volume == 0.2)
+}
+
+/// Leiser zuruecksetzen ist dagegen genau der Zweck der Absturzsicherung:
+/// Lautsprecher wurden fuer den Alarm angehoben.
+@Test func restoreFromFileStillLowers() {
+    let before = VolumeSnapshot(volume: 0.2, muted: true, deviceUID: "BuiltInSpeakerDevice")
+    let now = VolumeSnapshot(volume: 0.5, muted: false, deviceUID: "BuiltInSpeakerDevice")
+
+    #expect(before.restoreTarget(current: now, allowLouder: false) == before)
+}
+
+/// Eine Stummschaltung aufzuheben waere auch "lauter".
+@Test func restoreFromFileKeepsCurrentMute() {
+    let stale = VolumeSnapshot(volume: 0.3, muted: false, deviceUID: "EarPods")
+    let now = VolumeSnapshot(volume: 0.5, muted: true, deviceUID: "EarPods")
+
+    let target = stale.restoreTarget(current: now, allowLouder: false)
+    #expect(target.muted)
+    #expect(target.volume == 0.3)
+}
+
+/// Ist der aktuelle Zustand nicht lesbar, laesst sich "lauter" nicht pruefen;
+/// dann bleibt es beim gemerkten Wert wie bisher.
+@Test func restoreWithoutCurrentStateUsesSnapshot() {
+    let snapshot = VolumeSnapshot(volume: 0.4, muted: false, deviceUID: "EarPods")
+
+    #expect(snapshot.restoreTarget(current: nil, allowLouder: false) == snapshot)
+}

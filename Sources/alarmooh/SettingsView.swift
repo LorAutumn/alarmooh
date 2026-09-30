@@ -213,6 +213,12 @@ struct SettingsView: View {
             soundSection
             mutedSection
             loginSection
+            Section {
+                Text(AppVersion.display(for: .main))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 620)
@@ -296,19 +302,25 @@ struct SettingsView: View {
     }
 
     private var volumeSection: some View {
-        Section("Mindestlautstärke") {
-            HStack {
-                Slider(value: minimumVolume, in: 0...1) { editing in
-                    // Erst beim Loslassen schreiben, sonst eine Datei pro Pixel.
-                    if !editing { model.save() }
-                }
-                Text("\(Int((model.settings.minimumVolume * 100).rounded())) %")
-                    .monospacedDigit()
-                    .frame(width: 48, alignment: .trailing)
-            }
+        Section("Alarmlautstärke") {
+            volumeSlider("Lautsprecher", value: minimumVolume)
+            volumeSlider("Kopfhörer", value: headphoneVolume)
+            // Steht direkt am Regler statt nur im README: dort sieht ihn jeder,
+            // der den Wert aendert. Die niedrige Voreinstellung schuetzt, der
+            // Hinweis erklaert, warum man sie nicht leichtfertig hochzieht.
+            Label(
+                "Hohe Lautstärke über Kopfhörer kann das Gehör schädigen. "
+                + "Wähle einen Wert, der sich mit „Ton testen\" angenehm anhört.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
             Text(
-                "alarmooh hebt die Systemlautstärke für die Dauer eines Alarms auf "
-                + "mindestens diesen Wert an und stellt danach den vorherigen Wert wieder her."
+                "Für die Dauer eines Alarms hebt alarmooh die Systemlautstärke über Lautsprecher "
+                + "auf mindestens diesen Wert an. Über Kopfhörer stellt es genau diesen Wert ein, "
+                + "auch wenn es vorher lauter war. Danach gilt wieder der vorherige Wert. "
+                + "Als Kopfhörer gelten Geräte, die sich als Kopfhörer oder Headset melden (auch per USB), "
+                + "die Kopfhörerbuchse und alle Bluetooth-Geräte – auch Bluetooth-Lautsprecher."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -316,11 +328,25 @@ struct SettingsView: View {
                 model.togglePreview()
             }
             Text(
-                "Spielt den Alarmton einmal mit der eingestellten Lautstärke. "
+                "Spielt den Alarmton einmal mit der Lautstärke für das gerade aktive Ausgabegerät. "
                 + "Danach gilt wieder die vorherige Systemlautstärke."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private func volumeSlider(_ label: String, value: Binding<Float>) -> some View {
+        LabeledContent(label) {
+            HStack {
+                Slider(value: value, in: 0...1) { editing in
+                    // Erst beim Loslassen schreiben, sonst eine Datei pro Pixel.
+                    if !editing { model.save() }
+                }
+                Text("\(Int((value.wrappedValue * 100).rounded())) %")
+                    .monospacedDigit()
+                    .frame(width: 48, alignment: .trailing)
+            }
         }
     }
 
@@ -378,6 +404,13 @@ struct SettingsView: View {
         Binding(
             get: { model.settings.minimumVolume },
             set: { model.settings.minimumVolume = $0 }
+        )
+    }
+
+    private var headphoneVolume: Binding<Float> {
+        Binding(
+            get: { model.settings.headphoneVolume },
+            set: { model.settings.headphoneVolume = $0 }
         )
     }
 
