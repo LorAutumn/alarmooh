@@ -171,7 +171,7 @@ Weiter im Einstellungsfenster:
   sagt auch, warum.
 - **Vorlaufzeit** — 1 bis 15 Minuten, Standard 2.
 - **Mindestlautstärke** — zwei Regler: Lautsprecher (Standard 80 %) und Kopfhörer
-  (Standard 30 %). Welcher gilt, entscheidet das Ausgabegerät beim Alarmstart
+  (Standard 10 %). Welcher gilt, entscheidet das Ausgabegerät beim Alarmstart
   (`OutputDeviceKind`): Kopfhörer sind Geräte, deren Ausgabestream den Terminaltyp
   Kopfhörer oder Headset meldet (so erkennt man etwa USB-C-EarPods, die sonst nur
   „USB" wären), die Kopfhörerbuchse des eingebauten Ausgangs und alles über

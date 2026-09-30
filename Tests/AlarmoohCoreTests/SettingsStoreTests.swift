@@ -38,6 +38,10 @@ private func tempURL() -> URL {
     #expect(Settings().leadTime == 120)
 }
 
+@Test func defaultHeadphoneMinimumIsTenPercent() {
+    #expect(Settings().headphoneMinimumVolume == 0.1)
+}
+
 // MARK: - Toleranter Decoder
 
 private func load(json: String) throws -> Settings {

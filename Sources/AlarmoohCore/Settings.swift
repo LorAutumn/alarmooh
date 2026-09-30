@@ -13,7 +13,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var minimumVolume: Float = 0.8
     /// Dasselbe fuer Kopfhoerer. Deutlich niedriger, weil der Ton direkt am
     /// Ohr ankommt; siehe `OutputDeviceKind`.
-    public var headphoneMinimumVolume: Float = 0.3
+    public var headphoneMinimumVolume: Float = 0.1
     /// Pfad zur Audiodatei; nil bedeutet: erzeugten Fallback-Ton verwenden.
     public var soundPath: String?
     /// Sicherheitstakt fuer den Kalender-Scan.
