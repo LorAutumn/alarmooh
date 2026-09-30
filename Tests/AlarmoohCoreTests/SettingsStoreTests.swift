@@ -38,6 +38,10 @@ private func tempURL() -> URL {
     #expect(Settings().leadTime == 120)
 }
 
+@Test func defaultSpeakerMinimumIsFiftyPercent() {
+    #expect(Settings().minimumVolume == 0.5)
+}
+
 @Test func defaultHeadphoneMinimumIsTenPercent() {
     #expect(Settings().headphoneMinimumVolume == 0.1)
 }

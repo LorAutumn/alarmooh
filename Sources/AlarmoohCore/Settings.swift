@@ -10,7 +10,7 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Vorlauf vor Terminbeginn.
     public var leadTime: TimeInterval = 120
     /// Auf diesen Wert wird die Systemlautstaerke beim Alarm mindestens angehoben.
-    public var minimumVolume: Float = 0.8
+    public var minimumVolume: Float = 0.5
     /// Dasselbe fuer Kopfhoerer. Deutlich niedriger, weil der Ton direkt am
     /// Ohr ankommt; siehe `OutputDeviceKind`.
     public var headphoneMinimumVolume: Float = 0.1

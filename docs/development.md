@@ -170,7 +170,7 @@ Weiter im Einstellungsfenster:
   Ist die Serie stumm, ist der Schalter des einzelnen Termins ausgegraut, und die Zeile
   sagt auch, warum.
 - **Vorlaufzeit** — 1 bis 15 Minuten, Standard 2.
-- **Mindestlautstärke** — zwei Regler: Lautsprecher (Standard 80 %) und Kopfhörer
+- **Mindestlautstärke** — zwei Regler: Lautsprecher (Standard 50 %) und Kopfhörer
   (Standard 10 %). Welcher gilt, entscheidet das Ausgabegerät beim Alarmstart
   (`OutputDeviceKind`): Kopfhörer sind Geräte, deren Ausgabestream den Terminaltyp
   Kopfhörer oder Headset meldet (so erkennt man etwa USB-C-EarPods, die sonst nur
